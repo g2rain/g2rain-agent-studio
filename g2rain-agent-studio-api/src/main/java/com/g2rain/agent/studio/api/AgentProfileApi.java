@@ -3,6 +3,7 @@ package com.g2rain.agent.studio.api;
 import com.g2rain.agent.studio.dto.AgentProfileSelectDto;
 import com.g2rain.agent.studio.vo.AgentBundleVo;
 import com.g2rain.agent.studio.vo.AgentCatalogItemVo;
+import com.g2rain.agent.studio.vo.AgentOptionVo;
 import com.g2rain.agent.studio.vo.AgentProfileVo;
 import com.g2rain.agent.studio.vo.SkillDigestVo;
 import com.g2rain.common.model.PageData;
@@ -45,6 +46,16 @@ public interface AgentProfileApi {
     @Operation(summary = "查询 ACTIVE 数字员工目录", hidden = true,
         description = "并行拉取 PLATFORM（不隔离）与 CUSTOM（租户隔离）的 ACTIVE 画像，按 agentId 排序")
     Result<List<AgentCatalogItemVo>> selectActiveCatalog();
+
+    /**
+     * 查询 ACTIVE 数字员工下拉选项（PLATFORM 不隔离 + CUSTOM 本租户；仅 id + 名称）。
+     *
+     * @return ACTIVE Agent 选项列表
+     */
+    @GetMapping("/options")
+    @Operation(summary = "查询 ACTIVE 数字员工下拉选项",
+        description = "并行拉取 PLATFORM（不隔离）与 CUSTOM（租户隔离）的 ACTIVE 画像，仅返回 id 与 agentName")
+    Result<List<AgentOptionVo>> selectActiveOptions();
 
     /**
      * 按 agentId 解析画像（含 status，不筛 ACTIVE），供入口校验不存在 / 未启用。

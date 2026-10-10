@@ -20,6 +20,7 @@ import com.g2rain.agent.studio.enums.ResourceType;
 import com.g2rain.agent.studio.service.AgentProfileService;
 import com.g2rain.agent.studio.vo.AgentBundleVo;
 import com.g2rain.agent.studio.vo.AgentCatalogItemVo;
+import com.g2rain.agent.studio.vo.AgentOptionVo;
 import com.g2rain.agent.studio.vo.AgentProfileVo;
 import com.g2rain.agent.studio.vo.SkillDigestVo;
 import com.g2rain.common.concurrent.ContextExecutors;
@@ -115,6 +116,36 @@ public class AgentProfileServiceImpl implements AgentProfileService {
             .flatMap(List::stream)
             .sorted(Comparator.comparing(AgentProfilePo::getId, Comparator.nullsLast(Long::compareTo)))
             .map(AgentProfileConverter.INSTANCE::po2catalog)
+            .toList();
+    }
+
+    /**
+     * 查询 ACTIVE 数字员工下拉选项（PLATFORM 不隔离 + CUSTOM 本租户）。
+     *
+     * <p>查询策略与 {@link #selectActiveCatalog()} 相同，mapper 仅取 id / agent_name。
+     *
+     * @return ACTIVE Agent 选项列表
+     */
+    @Override
+    public List<AgentOptionVo> selectActiveOptions() {
+        return Stream.of(
+                ContextExecutors.callVirtual(() -> {
+                    AgentProfileSelectDto select = new AgentProfileSelectDto();
+                    select.setResourceType(ResourceType.PLATFORM.name());
+                    select.setStatus(ResourceStatus.ACTIVE.name());
+                    return agentProfileDao.selectOptionsListWithoutIsolation(select);
+                }),
+                ContextExecutors.callVirtual(() -> {
+                    AgentProfileSelectDto select = new AgentProfileSelectDto();
+                    select.setResourceType(ResourceType.CUSTOM.name());
+                    select.setStatus(ResourceStatus.ACTIVE.name());
+                    return agentProfileDao.selectOptionsList(select);
+                })
+            )
+            .map(CompletableFuture::join)
+            .flatMap(List::stream)
+            .sorted(Comparator.comparing(AgentProfilePo::getId, Comparator.nullsLast(Long::compareTo)))
+            .map(AgentProfileConverter.INSTANCE::po2option)
             .toList();
     }
 

@@ -109,4 +109,21 @@ public interface AgentProfileDao {
      */
     @IgnoreIsolation
     List<AgentProfilePo> selectListWithoutIsolation(AgentProfileSelectDto selectDto);
+
+    /**
+     * 按条件查询下拉选项字段（仅 id / agent_name），本租户隔离。
+     *
+     * @param selectDto 查询条件 DTO（常用 status + resourceType）
+     * @return 短字段 PO 列表
+     */
+    List<AgentProfilePo> selectOptionsList(AgentProfileSelectDto selectDto);
+
+    /**
+     * 按条件查询下拉选项字段（仅 id / agent_name），忽略数据隔离。
+     *
+     * @param selectDto 查询条件 DTO（常用 status + resourceType=PLATFORM）
+     * @return 短字段 PO 列表
+     */
+    @IgnoreIsolation
+    List<AgentProfilePo> selectOptionsListWithoutIsolation(AgentProfileSelectDto selectDto);
 }

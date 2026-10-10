@@ -3,6 +3,7 @@ package com.g2rain.agent.studio.converter;
 import com.g2rain.agent.studio.dao.po.AgentProfilePo;
 import com.g2rain.agent.studio.dto.AgentProfileDto;
 import com.g2rain.agent.studio.vo.AgentCatalogItemVo;
+import com.g2rain.agent.studio.vo.AgentOptionVo;
 import com.g2rain.agent.studio.vo.AgentProfileVo;
 import com.g2rain.common.converter.CommonConverter;
 import org.mapstruct.Mapper;
@@ -39,6 +40,11 @@ public interface AgentProfileConverter {
      */
     @Mapping(target = "agentId", source = "id")
     AgentCatalogItemVo po2catalog(AgentProfilePo po);
+
+    /**
+     * Po → 下拉选项（仅 id + agentName）
+     */
+    AgentOptionVo po2option(AgentProfilePo po);
 
     /**
      * Dto -> Po
