@@ -6,6 +6,7 @@ import com.g2rain.agent.studio.dto.AgentProfileSelectDto;
 import com.g2rain.agent.studio.service.AgentProfileService;
 import com.g2rain.agent.studio.vo.AgentBundleVo;
 import com.g2rain.agent.studio.vo.AgentCatalogItemVo;
+import com.g2rain.agent.studio.vo.AgentOptionVo;
 import com.g2rain.agent.studio.vo.AgentProfileVo;
 import com.g2rain.agent.studio.vo.SkillDigestVo;
 import com.g2rain.common.model.PageData;
@@ -47,6 +48,12 @@ public class AgentProfileController implements AgentProfileApi {
     @IdentityInject(organIdPropertyName = "organId")
     public Result<List<AgentCatalogItemVo>> selectActiveCatalog() {
         return Result.success(agentProfileService.selectActiveCatalog());
+    }
+
+    @Override
+    @IdentityInject(organIdPropertyName = "organId")
+    public Result<List<AgentOptionVo>> selectActiveOptions() {
+        return Result.success(agentProfileService.selectActiveOptions());
     }
 
     @Override

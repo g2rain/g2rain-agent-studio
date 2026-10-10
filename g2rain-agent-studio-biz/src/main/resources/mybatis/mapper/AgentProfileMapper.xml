@@ -415,4 +415,46 @@
     <select id="selectListWithoutIsolation" parameterType="com.g2rain.agent.studio.dto.AgentProfileSelectDto" resultMap="BaseResultMap">
         <include refid="selectListBody"/>
     </select>
+
+    <!-- selectOptionsList / selectOptionsListWithoutIsolation：仅 id + agent_name -->
+    <sql id="selectOptionsListBody">
+        SELECT id, agent_name
+        FROM agent_profile
+        <where>
+            <if test="id != null">
+                AND id = #{id, jdbcType=BIGINT}
+            </if>
+            <if test="ids != null and ids.size() > 0">
+                AND id IN
+                <foreach collection="ids" item="item" open="(" separator="," close=")">
+                    #{item, jdbcType=BIGINT}
+                </foreach>
+            </if>
+            <if test="organId != null">
+                AND organ_id = #{organId, jdbcType=BIGINT}
+            </if>
+            <if test="agentCode != null">
+                AND agent_code = #{agentCode, jdbcType=VARCHAR}
+            </if>
+            <if test="agentName != null">
+                AND agent_name = #{agentName, jdbcType=VARCHAR}
+            </if>
+            <if test="resourceType != null">
+                AND resource_type = #{resourceType, jdbcType=VARCHAR}
+            </if>
+            <if test="status != null">
+                AND status = #{status, jdbcType=VARCHAR}
+            </if>
+            AND (delete_flag = 0 OR delete_flag IS NULL)
+        </where>
+        <include refid="dynamicOrderBy"/>
+    </sql>
+
+    <select id="selectOptionsList" parameterType="com.g2rain.agent.studio.dto.AgentProfileSelectDto" resultMap="BaseResultMap">
+        <include refid="selectOptionsListBody"/>
+    </select>
+
+    <select id="selectOptionsListWithoutIsolation" parameterType="com.g2rain.agent.studio.dto.AgentProfileSelectDto" resultMap="BaseResultMap">
+        <include refid="selectOptionsListBody"/>
+    </select>
 </mapper>

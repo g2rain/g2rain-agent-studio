@@ -4,6 +4,7 @@ import com.g2rain.agent.studio.dto.AgentProfileDto;
 import com.g2rain.agent.studio.dto.AgentProfileSelectDto;
 import com.g2rain.agent.studio.vo.AgentBundleVo;
 import com.g2rain.agent.studio.vo.AgentCatalogItemVo;
+import com.g2rain.agent.studio.vo.AgentOptionVo;
 import com.g2rain.agent.studio.vo.AgentProfileVo;
 import com.g2rain.agent.studio.vo.SkillDigestVo;
 import com.g2rain.common.model.PageData;
@@ -33,6 +34,13 @@ public interface AgentProfileService {
      * @return ACTIVE Agent 摘要列表
      */
     List<AgentCatalogItemVo> selectActiveCatalog();
+
+    /**
+     * 查询 ACTIVE 数字员工下拉选项（PLATFORM 不隔离 + CUSTOM 本租户；仅 id + 名称）。
+     *
+     * @return ACTIVE Agent 选项列表
+     */
+    List<AgentOptionVo> selectActiveOptions();
 
     /**
      * 按 agentId 解析画像（含 status，不筛 ACTIVE）。
