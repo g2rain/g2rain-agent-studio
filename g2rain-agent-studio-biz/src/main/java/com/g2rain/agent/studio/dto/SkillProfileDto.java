@@ -32,6 +32,13 @@ public class SkillProfileDto extends BaseDto {
     private Long organId;
 
     /**
+     * 所属数字员工主键（agent_profile.id）
+     */
+    @NotNull(groups = CreateGroup.class)
+    @Schema(description = "所属数字员工主键（新增必填）")
+    private Long agentId;
+
+    /**
      * Skill 唯一键，如 crm.quote.query
      */
     @NotBlank(groups = CreateGroup.class)

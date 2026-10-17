@@ -26,6 +26,11 @@ public class SkillProfilePo extends BasePo {
     private Long organId;
 
     /**
+     * 所属数字员工主键（agent_profile.id）
+     */
+    private Long agentId;
+
+    /**
      * Skill 唯一键，如 crm.quote.query
      */
     private String skillKey;

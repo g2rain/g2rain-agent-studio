@@ -30,6 +30,12 @@ public class SkillProfileVo extends BaseVo {
     private Long organId;
 
     /**
+     * 所属数字员工主键（agent_profile.id）
+     */
+    @Schema(description = "所属数字员工主键")
+    private Long agentId;
+
+    /**
      * Skill 唯一键，如 crm.quote.query
      */
     @Schema(description = "Skill 唯一键，如 crm.quote.query")

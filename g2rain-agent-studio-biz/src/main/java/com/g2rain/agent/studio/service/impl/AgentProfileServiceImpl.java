@@ -2,16 +2,15 @@ package com.g2rain.agent.studio.service.impl;
 
 import com.g2rain.agent.studio.converter.AgentProfileConverter;
 import com.g2rain.agent.studio.dao.AgentProfileDao;
-import com.g2rain.agent.studio.dao.AgentSkillBindingDao;
 import com.g2rain.agent.studio.dao.SkillProfileDao;
 import com.g2rain.agent.studio.dao.SkillToolBindingDao;
 import com.g2rain.agent.studio.dao.po.AgentProfilePo;
-import com.g2rain.agent.studio.dao.po.AgentSkillBindingPo;
 import com.g2rain.agent.studio.dao.po.SkillProfilePo;
 import com.g2rain.agent.studio.dao.po.SkillToolBindingPo;
 import com.g2rain.agent.studio.dto.AgentProfileDto;
 import com.g2rain.agent.studio.dto.AgentProfileSelectDto;
-import com.g2rain.agent.studio.dto.AgentSkillBindingSelectDto;
+import com.g2rain.agent.studio.dto.UpdateStatusDto;
+import com.g2rain.agent.studio.enums.ResourceStatus;
 import com.g2rain.agent.studio.dto.SkillProfileSelectDto;
 import com.g2rain.agent.studio.dto.SkillToolBindingSelectDto;
 import com.g2rain.agent.studio.enums.EnabledFlag;
@@ -38,6 +37,7 @@ import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -47,7 +47,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -62,9 +61,6 @@ public class AgentProfileServiceImpl implements AgentProfileService {
 
     @Resource(name = "agentProfileDao")
     private AgentProfileDao agentProfileDao;
-
-    @Resource(name = "agentSkillBindingDao")
-    private AgentSkillBindingDao agentSkillBindingDao;
 
     @Resource(name = "skillToolBindingDao")
     private SkillToolBindingDao skillToolBindingDao;
@@ -83,6 +79,17 @@ public class AgentProfileServiceImpl implements AgentProfileService {
     @Override
     public List<AgentProfileVo> selectList(AgentProfileSelectDto selectDto) {
         return agentProfileDao.selectList(selectDto)
+            .stream()
+            .map(AgentProfileConverter.INSTANCE::po2vo)
+            .toList();
+    }
+
+    @Override
+    public List<AgentProfileVo> selectPlatformList(AgentProfileSelectDto selectDto) {
+        AgentProfileSelectDto query = selectDto != null ? selectDto : new AgentProfileSelectDto();
+        query.setResourceType(ResourceType.PLATFORM.name());
+        query.setOrganId(null);
+        return agentProfileDao.selectListWithoutIsolation(query)
             .stream()
             .map(AgentProfileConverter.INSTANCE::po2vo)
             .toList();
@@ -181,93 +188,63 @@ public class AgentProfileServiceImpl implements AgentProfileService {
     }
 
     /**
-     * 按 agentId 查询绑定 Skill 短目录（不含手册 / 契约 / tools）。
-     *
-     * <p>读启用中的 Agent-Skill 绑定，再经 {@link #loadActiveDigestSkills} 拉短字段组装。
+     * 按 agentId 查询 ACTIVE Skill 短目录（不含手册 / 契约 / tools）。
      *
      * @param agentId 数字员工标识
-     * @return Skill 短目录；无绑定为空列表
+     * @return Skill 短目录；无技能为空列表
      */
     @Override
     public List<SkillDigestVo> selectSkillDigest(Long agentId) {
-        AgentSkillBindingSelectDto bindingSelect = new AgentSkillBindingSelectDto();
-        bindingSelect.setAgentId(agentId);
-        bindingSelect.setEnabledFlag(EnabledFlag.YES.getCode());
-        List<AgentSkillBindingPo> bindings = agentSkillBindingDao.selectList(bindingSelect);
-        if (Collections.isEmpty(bindings)) {
-            return List.of();
-        }
-
-        Map<Long, SkillProfilePo> skillMap = loadActiveDigestSkills(bindings);
-        return bindings.stream()
-            .map(binding -> {
-                SkillProfilePo skill = skillMap.get(binding.getSkillId());
-                if (skill == null) {
-                    return null;
-                }
+        return loadActiveDigestSkills(agentId).stream()
+            .map(skill -> {
                 SkillDigestVo item = new SkillDigestVo();
                 item.setSkillKey(skill.getSkillKey());
                 item.setSkillName(skill.getSkillName());
                 item.setSemanticDesc(skill.getSemanticDesc());
                 return item;
             })
-            .filter(Objects::nonNull)
             .toList();
     }
 
     /**
-     * 按绑定 skillIds 加载 ACTIVE Skill 短字段（不含手册 / 契约）。
-     *
-     * <p>CUSTOM 隔离查 + PLATFORM 不隔离查，合并为 id → PO。
+     * 按 agentId 加载 ACTIVE Skill 短字段（CUSTOM 隔离 + PLATFORM 不隔离）。
      */
-    private Map<Long, SkillProfilePo> loadActiveDigestSkills(List<AgentSkillBindingPo> skillBindings) {
-        Set<Long> skillIds = skillBindings.stream()
-            .map(AgentSkillBindingPo::getSkillId)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toCollection(HashSet::new));
-        if (Collections.isEmpty(skillIds)) {
-            return Map.of();
-        }
-
+    private List<SkillProfilePo> loadActiveDigestSkills(Long agentId) {
         SkillProfileSelectDto custom = new SkillProfileSelectDto();
-        custom.setIds(skillIds);
+        custom.setAgentId(agentId);
         custom.setResourceType(ResourceType.CUSTOM.name());
         custom.setStatus(ResourceStatus.ACTIVE.name());
         SkillProfileSelectDto platform = new SkillProfileSelectDto();
-        platform.setIds(skillIds);
+        platform.setAgentId(agentId);
         platform.setResourceType(ResourceType.PLATFORM.name());
         platform.setStatus(ResourceStatus.ACTIVE.name());
         return Stream.concat(
             skillProfileDao.selectDigestList(custom).stream(),
             skillProfileDao.selectDigestListWithoutIsolation(platform).stream()
-        ).collect(Collectors.toMap(SkillProfilePo::getId, Function.identity(), (a, _) -> a));
+        ).toList();
     }
 
     /**
      * 按 agentId 查询能力包：Skill（手册/契约）+ 其下 Tool 列表。
      *
-     * <p>绑定 → ACTIVE Skill 全量字段 → 按 skillIds 拉 Tool，挂到对应 Skill。
-     *
      * @param agentId 数字员工标识
-     * @return 能力包；无绑定时 skills 为空列表
+     * @return 能力包；无技能时 skills 为空列表
      */
     @Override
     public AgentBundleVo selectCapabilityBundle(Long agentId) {
-        AgentSkillBindingSelectDto bindingSelect = new AgentSkillBindingSelectDto();
-        bindingSelect.setAgentId(agentId);
-        bindingSelect.setEnabledFlag(EnabledFlag.YES.getCode());
-        List<AgentSkillBindingPo> bindings = agentSkillBindingDao.selectList(bindingSelect);
-        if (Collections.isEmpty(bindings)) {
+        List<SkillProfilePo> skillProfiles = loadActiveSkills(agentId);
+        if (Collections.isEmpty(skillProfiles)) {
             return new AgentBundleVo(List.of());
         }
 
-        Map<Long, SkillProfilePo> skillMap = loadActiveSkills(bindings);
-
-        Set<Long> skillIds = skillMap.keySet();
+        Set<Long> skillIds = skillProfiles.stream()
+            .map(SkillProfilePo::getId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toCollection(HashSet::new));
         SkillToolBindingSelectDto toolSelect = new SkillToolBindingSelectDto();
         toolSelect.setSkillIds(skillIds);
         toolSelect.setEnabledFlag(EnabledFlag.YES.getCode());
-        List<SkillToolBindingPo> toolBindings = skillToolBindingDao.selectList(toolSelect);
+        var toolBindings = skillToolBindingDao.selectListWithoutIsolation(toolSelect);
 
         Map<Long, List<AgentBundleVo.ToolBriefVo>> toolsBySkill = toolBindings.stream()
             .collect(Collectors.groupingBy(
@@ -279,53 +256,38 @@ public class AgentProfileServiceImpl implements AgentProfileService {
                 }, Collectors.toList())
             ));
 
-        List<AgentBundleVo.SkillBriefVo> skills = bindings.stream()
-            .map(binding -> {
-                SkillProfilePo skill = skillMap.get(binding.getSkillId());
-                if (skill == null) {
-                    return null;
-                }
+        List<AgentBundleVo.SkillBriefVo> skills = skillProfiles.stream()
+            .map(skill -> {
                 AgentBundleVo.SkillBriefVo brief = new AgentBundleVo.SkillBriefVo();
                 brief.setSkillKey(skill.getSkillKey());
                 brief.setSkillName(skill.getSkillName());
                 brief.setSemanticDesc(skill.getSemanticDesc());
                 brief.setSkillManual(skill.getSkillManual());
                 brief.setSkillContract(skill.getSkillContract());
-                brief.setTools(toolsBySkill.getOrDefault(binding.getSkillId(), List.of()));
+                brief.setTools(toolsBySkill.getOrDefault(skill.getId(), List.of()));
                 return brief;
             })
-            .filter(Objects::nonNull)
             .toList();
 
         return new AgentBundleVo(skills);
     }
 
     /**
-     * 按绑定 skillIds 加载 ACTIVE Skill 完整字段（含手册 / 契约）。
-     *
-     * <p>CUSTOM 隔离查 + PLATFORM 不隔离查，合并为 id → PO。
+     * 按 agentId 加载 ACTIVE Skill 完整字段（CUSTOM 隔离 + PLATFORM 不隔离）。
      */
-    private Map<Long, SkillProfilePo> loadActiveSkills(List<AgentSkillBindingPo> skillBindings) {
-        Set<Long> skillIds = skillBindings.stream()
-            .map(AgentSkillBindingPo::getSkillId)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toCollection(HashSet::new));
-        if (Collections.isEmpty(skillIds)) {
-            return Map.of();
-        }
-
+    private List<SkillProfilePo> loadActiveSkills(Long agentId) {
         SkillProfileSelectDto custom = new SkillProfileSelectDto();
-        custom.setIds(skillIds);
+        custom.setAgentId(agentId);
         custom.setResourceType(ResourceType.CUSTOM.name());
         custom.setStatus(ResourceStatus.ACTIVE.name());
         SkillProfileSelectDto platform = new SkillProfileSelectDto();
-        platform.setIds(skillIds);
+        platform.setAgentId(agentId);
         platform.setResourceType(ResourceType.PLATFORM.name());
         platform.setStatus(ResourceStatus.ACTIVE.name());
         return Stream.concat(
             skillProfileDao.selectList(custom).stream(),
             skillProfileDao.selectListWithoutIsolation(platform).stream()
-        ).collect(Collectors.toMap(SkillProfilePo::getId, Function.identity(), (a, _) -> a));
+        ).toList();
     }
 
     @Override
@@ -333,6 +295,25 @@ public class AgentProfileServiceImpl implements AgentProfileService {
         Page<AgentProfilePo> page = PageContext.of(selectDto.getPageNum(), selectDto.getPageSize(), () -> {
             agentProfileDao.selectList(selectDto.getQuery());
         });
+        List<AgentProfileVo> result = page.getResult()
+            .stream()
+            .map(AgentProfileConverter.INSTANCE::po2vo)
+            .toList();
+        return PageData.of(page.getPageNum(), page.getPageSize(), page.getTotal(), result);
+    }
+
+    @Override
+    public PageData<AgentProfileVo> selectPlatformPage(PageSelectListDto<AgentProfileSelectDto> selectDto) {
+        AgentProfileSelectDto query = selectDto.getQuery();
+        if (Objects.isNull(query)) {
+            query = new AgentProfileSelectDto();
+            selectDto.setQuery(query);
+        }
+        query.setResourceType(ResourceType.PLATFORM.name());
+        query.setOrganId(null);
+        Page<AgentProfilePo> page = PageContext.of(selectDto.getPageNum(), selectDto.getPageSize(), () ->
+            agentProfileDao.selectListWithoutIsolation(selectDto.getQuery())
+        );
         List<AgentProfileVo> result = page.getResult()
             .stream()
             .map(AgentProfileConverter.INSTANCE::po2vo)
@@ -350,8 +331,16 @@ public class AgentProfileServiceImpl implements AgentProfileService {
         // 判断是新增还是更新
         Long id = entity.getId();
         if (Objects.isNull(id) || id == 0) {
-            // 新增：使用IdGenerator生成主键
+            // 同机构下 agentCode 唯一
+            AgentProfileSelectDto codeSelect = new AgentProfileSelectDto();
+            codeSelect.setOrganId(dto.getOrganId());
+            codeSelect.setAgentCode(dto.getAgentCode());
+            Asserts.isTrue(Collections.isEmpty(agentProfileDao.selectList(codeSelect)),
+                SystemErrorCode.DATA_EXISTS, dto.getAgentCode());
+
+            // 新增：使用IdGenerator生成主键；状态固定 ACTIVE（启停走 updateStatus）
             entity.setId(idGenerator.generateId());
+            entity.setStatus(ResourceStatus.ACTIVE.name());
             LocalDateTime now = Moments.now();
             entity.setUpdateTime(now);
             entity.setCreateTime(now);
@@ -360,19 +349,43 @@ public class AgentProfileServiceImpl implements AgentProfileService {
         } else {
             AgentProfilePo existing = agentProfileDao.selectById(id);
             Asserts.isTrue(Objects.nonNull(existing), SystemErrorCode.DATA_NOT_EXISTS, id);
-            // 更新：直接更新
+            // 更新：不允许改状态、编码（启停 / 改键另走）
+            entity.setStatus(null);
+            entity.setAgentCode(null);
             entity.setUpdateTime(Moments.now());
-            int success = agentProfileDao.update(entity);
-            Asserts.greaterThan(success, 0, SystemErrorCode.UPDATE_DATA_ERROR, id);
+            Asserts.greaterThan(agentProfileDao.update(entity), 0, SystemErrorCode.UPDATE_DATA_ERROR, id);
         }
 
         return entity.getId();
     }
 
+    /**
+     * 删除智能体：级联删除其下 Skill 及各 Skill 的 Tool 绑定。
+     */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int delete(Long id) {
         AgentProfilePo existing = agentProfileDao.selectById(id);
         Asserts.isTrue(Objects.nonNull(existing), SystemErrorCode.DATA_NOT_EXISTS, id);
+
+        skillToolBindingDao.deleteByAgentId(id);
+        skillProfileDao.deleteByAgentId(id);
         return agentProfileDao.delete(id);
+    }
+
+    @Override
+    public int updateStatus(Long id, UpdateStatusDto dto) {
+        ResourceStatus.validate(dto.getStatus());
+
+        AgentProfilePo existing = agentProfileDao.selectById(id);
+        Asserts.isTrue(Objects.nonNull(existing), SystemErrorCode.DATA_NOT_EXISTS, id);
+
+        AgentProfilePo entity = new AgentProfilePo();
+        entity.setId(id);
+        entity.setStatus(dto.getStatus());
+        entity.setUpdateTime(Moments.now());
+        int success = agentProfileDao.update(entity);
+        Asserts.greaterThan(success, 0, SystemErrorCode.UPDATE_DATA_ERROR, id);
+        return success;
     }
 }

@@ -3,7 +3,10 @@ package com.g2rain.agent.studio.controller;
 import com.g2rain.agent.studio.api.AgentProfileApi;
 import com.g2rain.agent.studio.dto.AgentProfileDto;
 import com.g2rain.agent.studio.dto.AgentProfileSelectDto;
+import com.g2rain.agent.studio.dto.UpdateStatusDto;
+import com.g2rain.agent.studio.enums.ResourceType;
 import com.g2rain.agent.studio.service.AgentProfileService;
+import com.g2rain.agent.studio.utils.OwnerGuard;
 import com.g2rain.agent.studio.vo.AgentBundleVo;
 import com.g2rain.agent.studio.vo.AgentCatalogItemVo;
 import com.g2rain.agent.studio.vo.AgentOptionVo;
@@ -16,6 +19,7 @@ import com.g2rain.web.interceptors.annotations.IdentityInject;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.annotation.Resource;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,8 +44,15 @@ public class AgentProfileController implements AgentProfileApi {
 
     @Override
     @IdentityInject(organIdPropertyName = "organId")
-    public Result<List<AgentProfileVo>> selectList(AgentProfileSelectDto selectDto) {
+    public Result<List<AgentProfileVo>> selectCustomList(AgentProfileSelectDto selectDto) {
+        selectDto.setResourceType(ResourceType.CUSTOM.name());
         return Result.success(agentProfileService.selectList(selectDto));
+    }
+
+    @Override
+    @IdentityInject(organIdPropertyName = "organId")
+    public Result<List<AgentProfileVo>> selectPlatformList(AgentProfileSelectDto selectDto) {
+        return Result.success(agentProfileService.selectPlatformList(selectDto));
     }
 
     @Override
@@ -76,14 +87,38 @@ public class AgentProfileController implements AgentProfileApi {
 
     @Override
     @IdentityInject(organIdPropertyName = "organId")
-    public Result<PageData<AgentProfileVo>> selectPage(PageSelectListDto<AgentProfileSelectDto> selectDto) {
+    public Result<PageData<AgentProfileVo>> selectCustomPage(PageSelectListDto<AgentProfileSelectDto> selectDto) {
+        selectDto.getQuery().setResourceType(ResourceType.CUSTOM.name());
         return Result.successPage(agentProfileService.selectPage(selectDto));
     }
 
-    @PostMapping("/save")
-    @Operation(summary = "新增或更新数字员工画像表信息", description = "新增或更新数字员工画像表基础信息")
-    public Result<Long> save(@RequestBody AgentProfileDto dto) {
+    @Override
+    @IdentityInject(organIdPropertyName = "organId")
+    public Result<PageData<AgentProfileVo>> selectPlatformPage(PageSelectListDto<AgentProfileSelectDto> selectDto) {
+        return Result.successPage(agentProfileService.selectPlatformPage(selectDto));
+    }
+
+    @PostMapping("/custom/save")
+    @IdentityInject(organIdPropertyName = "organId")
+    @Operation(summary = "新增或更新自建智能体", description = "resourceType 由服务端固定为 CUSTOM")
+    public Result<Long> saveCustom(@RequestBody AgentProfileDto dto) {
+        dto.setResourceType(ResourceType.CUSTOM.name());
         return Result.success(agentProfileService.save(dto));
+    }
+
+    @PostMapping("/platform/save")
+    @IdentityInject(organIdPropertyName = "organId")
+    @Operation(summary = "新增或更新平台智能体", description = "resourceType 由服务端固定为 PLATFORM")
+    public Result<Long> savePlatform(@RequestBody AgentProfileDto dto) {
+        OwnerGuard.requireOperator();
+        dto.setResourceType(ResourceType.PLATFORM.name());
+        return Result.success(agentProfileService.save(dto));
+    }
+
+    @PostMapping("/{id}/status")
+    @Operation(summary = "修改智能体状态", description = "仅允许改状态")
+    public Result<Integer> updateStatus(@Parameter(description = "智能体标识") @PathVariable Long id, @RequestBody @Validated UpdateStatusDto dto) {
+        return Result.success(agentProfileService.updateStatus(id, dto));
     }
 
     @DeleteMapping("/{id}")

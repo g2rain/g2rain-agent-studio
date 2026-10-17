@@ -2,6 +2,7 @@ package com.g2rain.agent.studio.service;
 
 import com.g2rain.agent.studio.dto.SkillToolBindingDto;
 import com.g2rain.agent.studio.dto.SkillToolBindingSelectDto;
+import com.g2rain.agent.studio.dto.UpdateEnabledFlagDto;
 import com.g2rain.agent.studio.vo.SkillToolBindingVo;
 import com.g2rain.common.model.PageData;
 import com.g2rain.common.model.PageSelectListDto;
@@ -47,4 +48,13 @@ public interface SkillToolBindingService {
      * @return 操作结果（影响行数）
      */
     int delete(Long id);
+
+    /**
+     * 仅修改启用标记。
+     *
+     * @param id  主键
+     * @param dto 启用标记
+     * @return 影响行数
+     */
+    int updateEnabled(Long id, UpdateEnabledFlagDto dto);
 }

@@ -40,6 +40,7 @@ DROP TABLE IF EXISTS `skill_profile`;
 CREATE TABLE `skill_profile` (
     `id` BIGINT NOT NULL COMMENT                                                                        '主键标识',
     `organ_id` BIGINT NOT NULL COMMENT                                                                  '机构标识',
+    `agent_id` BIGINT NOT NULL COMMENT                                                                  '所属数字员工主键（agent_profile.id）',
     `skill_key` VARCHAR(128) NOT NULL COMMENT                                                           'Skill 唯一键，如 crm.quote.query',
     `skill_name` VARCHAR(128) NOT NULL COMMENT                                                          'Skill 名称',
     `resource_type` VARCHAR(32) NOT NULL COMMENT                                                        '资源类型[PLATFORM:G2rain员工, CUSTOM:租户自定义/安装副本]',
@@ -52,32 +53,12 @@ CREATE TABLE `skill_profile` (
     `update_time` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT          '更新时间',
     `version` INT NOT NULL DEFAULT 0 COMMENT                                                            '记录版本',
     `delete_flag` TINYINT NOT NULL DEFAULT 0 COMMENT                                                    '逻辑删除标记[0:未删除, 1:已删除]',
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    INDEX `idx_agent_id` (`agent_id`, `delete_flag`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT=                             'Skill 定义表';
 
 -- ---------------------------------------------
--- 3. Skill 绑定 (agent_skill_binding)
--- ---------------------------------------------
-DROP TABLE IF EXISTS `agent_skill_binding`;
-
-CREATE TABLE `agent_skill_binding` (
-    `id` BIGINT NOT NULL COMMENT                                                                        '主键标识',
-    `organ_id` BIGINT NOT NULL COMMENT                                                                  '机构标识',
-    `agent_id` BIGINT NOT NULL COMMENT                                                                  '数字员工主键（agent_profile.id）',
-    `skill_id` BIGINT NOT NULL COMMENT                                                                  'Skill 主键（skill_profile.id）',
-    `enabled_flag` TINYINT NOT NULL DEFAULT 1 COMMENT                                                   '是否启用[0:否, 1:是]',
-    `description` VARCHAR(500) DEFAULT NULL COMMENT                                                     '备注',
-    `create_time` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP COMMENT                                      '创建时间',
-    `update_time` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT          '更新时间',
-    `version` INT NOT NULL DEFAULT 0 COMMENT                                                            '记录版本',
-    `delete_flag` TINYINT NOT NULL DEFAULT 0 COMMENT                                                    '逻辑删除标记[0:未删除, 1:已删除]',
-    PRIMARY KEY (`id`),
-    INDEX `idx_agent_id` (`agent_id`, `delete_flag`),
-    INDEX `idx_skill_id` (`skill_id`, `delete_flag`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT=                             '数字员工 Skill 绑定表';
-
--- ---------------------------------------------
--- 4. Tool 绑定 (skill_tool_binding)
+-- 3. Tool 绑定 (skill_tool_binding)
 -- ---------------------------------------------
 DROP TABLE IF EXISTS `skill_tool_binding`;
 
@@ -127,10 +108,10 @@ VALUES
 -- 细粒度 HTTP/MCP 调用在 Tool 绑定，不在 Skill 表拆碎
 -- ---------------------------------------------
 INSERT INTO `skill_profile`
-(`id`, `organ_id`, `skill_key`, `skill_name`, `resource_type`, `semantic_desc`, `skill_manual`, `skill_contract`,
+(`id`, `organ_id`, `agent_id`, `skill_key`, `skill_name`, `resource_type`, `semantic_desc`, `skill_manual`, `skill_contract`,
  `status`, `description`, `version`, `delete_flag`)
 VALUES
-(11001, 2, 'cms.structure.manage', '站点与信息架构管理', 'PLATFORM',
+(11001, 2, 10001, 'cms.structure.manage', '站点与信息架构管理', 'PLATFORM',
  '负责 CMS 网站、内容空间和导航栏目。本轮查询已有结构，或本轮明确要求创建/调整结构时才写入。不负责文章分类、文章正文、页面（静态页）或标签。',
  '## 目标
 完成本轮被问到的结构查询，或用户本轮明确要求的网站/空间/栏目写入。
@@ -150,7 +131,7 @@ VALUES
  '{"mode":"REACT","delegatable":false,"outputs":{"web_site_list":{"type":"LIST","fields":["id","siteName","siteCode","domain","status"],"required":false},"space_list":{"type":"LIST","fields":["id","spaceName","spaceCode","spaceType","status"],"required":false},"channel_list":{"type":"LIST","fields":["id","siteId","spaceId","parentId","channelName","channelCode","channelType","path","categoryId","pageId","status"],"required":false}},"tools":{"get_web_site_list":{"label":"查询站点","sideEffect":"NONE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}},"siteName":{"required":false,"sources":["USER","MODEL"]}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"web_site_list","path":"data","fields":["id","siteName","siteCode","domain","status"],"entity":{"type":"site","id":"id","name":"siteName"}}]},"post_web_site_save":{"label":"保存站点","sideEffect":"WRITE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}},"id":{"required":false,"sources":["EVIDENCE","PRIOR_TASK"],"label":"站点 ID"},"siteName":{"sources":["USER","MODEL"],"label":"站点名称"},"siteCode":{"sources":["USER","MODEL"],"label":"站点编码"},"domain":{"required":false,"sources":["USER","MODEL"],"label":"站点域名"},"status":{"required":false,"sources":["USER","MODEL"],"label":"状态"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"web_site_saved","path":"data","entity":{"type":"site","scalar":"id","name":"siteName"}}]},"get_space_list":{"label":"查询内容空间","sideEffect":"NONE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}},"spaceName":{"required":false,"sources":["USER","MODEL"]},"spaceType":{"required":false,"enum":["WEBSITE","KNOWLEDGE","INTERNAL"],"sources":["USER","MODEL"]}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"space_list","path":"data","fields":["id","spaceName","spaceCode","spaceType","status"],"entity":{"type":"space","id":"id","name":"spaceName"}}]},"post_space_save":{"label":"保存内容空间","sideEffect":"WRITE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}},"id":{"required":false,"sources":["EVIDENCE","PRIOR_TASK"],"label":"内容空间 ID"},"spaceName":{"sources":["USER","MODEL"],"label":"空间名称"},"spaceCode":{"sources":["USER","MODEL"],"label":"空间编码"},"spaceType":{"enum":["WEBSITE","KNOWLEDGE","INTERNAL"],"sources":["USER","MODEL"],"label":"空间类型"},"status":{"enum":["ENABLED","DISABLED"],"sources":["USER","MODEL"],"label":"状态"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"space_saved","path":"data","entity":{"type":"space","scalar":"id","name":"spaceName"}}]},"get_channel_list":{"label":"查询栏目","sideEffect":"NONE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}},"siteId":{"required":false,"sources":["USER","EVIDENCE","PRIOR_TASK"]},"spaceId":{"required":false,"sources":["USER","EVIDENCE","PRIOR_TASK"]},"parentId":{"required":false,"sources":["USER","EVIDENCE","PRIOR_TASK"]},"channelName":{"required":false,"sources":["USER","MODEL"]}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"channel_list","path":"data","fields":["id","siteId","spaceId","parentId","channelName","channelCode","channelType","path","categoryId","pageId","status"],"entity":{"type":"channel","id":"id","name":"channelName"}}]},"post_channel_save":{"label":"保存栏目","sideEffect":"WRITE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}},"id":{"required":false,"sources":["EVIDENCE","PRIOR_TASK"],"label":"栏目 ID"},"siteId":{"sources":["EVIDENCE","PRIOR_TASK"],"missing":{"action":"CALL_TOOL","tool":"get_web_site_list","message":"先查询站点"},"label":"站点"},"spaceId":{"sources":["EVIDENCE","PRIOR_TASK"],"missing":{"action":"CALL_TOOL","tool":"get_space_list","message":"先查询内容空间"},"label":"内容空间"},"parentId":{"required":false,"sources":["EVIDENCE","PRIOR_TASK"],"label":"父栏目"},"channelName":{"sources":["USER","MODEL"],"label":"栏目名称"},"channelCode":{"required":false,"sources":["USER","MODEL"],"label":"栏目编码"},"channelType":{"enum":["LIST","PAGE","LINK"],"sources":["USER","MODEL"],"label":"栏目类型"},"path":{"required":false,"sources":["USER","MODEL"],"label":"访问路径"},"categoryId":{"required":false,"sources":["USER","EVIDENCE","PRIOR_TASK"],"label":"文章分类"},"pageId":{"required":false,"sources":["USER","EVIDENCE","PRIOR_TASK"],"label":"静态页面"},"linkUrl":{"required":false,"sources":["USER","MODEL"],"label":"外链地址"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"channel_saved","path":"data","entity":{"type":"channel","scalar":"id","name":"channelName"}}]},"post_web_site_update_status":{"label":"变更站点状态","sideEffect":"WRITE","args":{"id":{"sources":["EVIDENCE","PRIOR_TASK"],"missing":{"action":"CALL_TOOL","tool":"get_web_site_list"},"label":"站点 ID"},"status":{"sources":["USER","MODEL"],"label":"目标状态"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"}},"post_space_update_status":{"label":"变更内容空间状态","sideEffect":"WRITE","args":{"id":{"sources":["EVIDENCE","PRIOR_TASK"],"missing":{"action":"CALL_TOOL","tool":"get_space_list"},"label":"内容空间 ID"},"status":{"enum":["ENABLED","DISABLED"],"sources":["USER","MODEL"],"label":"目标状态"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"}},"post_channel_update_status":{"label":"变更栏目状态","sideEffect":"WRITE","args":{"id":{"sources":["EVIDENCE","PRIOR_TASK"],"missing":{"action":"CALL_TOOL","tool":"get_channel_list"},"label":"栏目 ID"},"status":{"sources":["USER","MODEL"],"label":"目标状态"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"}},"delete_web_site_id":{"label":"删除站点","sideEffect":"WRITE","args":{"id":{"sources":["EVIDENCE","PRIOR_TASK"],"missing":{"action":"CALL_TOOL","tool":"get_web_site_list"},"label":"站点 ID"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"}},"delete_space_id":{"label":"删除内容空间","sideEffect":"WRITE","args":{"id":{"sources":["EVIDENCE","PRIOR_TASK"],"missing":{"action":"CALL_TOOL","tool":"get_space_list"},"label":"内容空间 ID"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"}},"delete_channel_id":{"label":"删除栏目","sideEffect":"WRITE","args":{"id":{"sources":["EVIDENCE","PRIOR_TASK"],"missing":{"action":"CALL_TOOL","tool":"get_channel_list"},"label":"栏目 ID"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"}},"get_web_site_page":{"label":"分页查询站点","sideEffect":"NONE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"web_site_list","path":"data.records","fields":["id","siteName","siteCode","domain","status"],"entity":{"type":"site","id":"id","name":"siteName"}}]},"get_space_page":{"label":"分页查询内容空间","sideEffect":"NONE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"space_list","path":"data.records","fields":["id","spaceName","spaceCode","spaceType","status"],"entity":{"type":"space","id":"id","name":"spaceName"}}]},"get_channel_page":{"label":"分页查询栏目","sideEffect":"NONE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"channel_list","path":"data.records","fields":["id","siteId","spaceId","parentId","channelName","channelCode","channelType","path","categoryId","pageId","status"],"entity":{"type":"channel","id":"id","name":"channelName"}}]}}}',
  'ACTIVE', 'CMS 信息架构能力', 0, 0),
 
-(11002, 2, 'cms.article.lifecycle', '文章内容生命周期', 'PLATFORM',
+(11002, 2, 10001, 'cms.article.lifecycle', '文章内容生命周期', 'PLATFORM',
  '负责 CMS 文章及文章分类。本轮要求检索、撰写、发布或修改文章，或查询、创建、调整文章分类时选用。不负责建站、导航栏目或标签。',
  '## 目标
 完成本轮明确的文章查询、创建、草稿保存或发布，以及文章分类的查询与创建。
@@ -173,7 +154,7 @@ VALUES
  '{"mode":"REACT","delegatable":false,"outputs":{"space_list":{"type":"LIST","fields":["id","spaceName","spaceCode","spaceType","status"],"required":false},"article_list":{"type":"LIST","fields":["id","spaceId","categoryId","title","status","author","contentType"],"required":false},"article_page":{"type":"LIST","fields":["id","spaceId","categoryId","title","status","author","contentType"],"required":false},"article_detail":{"type":"LIST","fields":["id","spaceId","categoryId","title","summary","status","content","contentType","author"],"required":false},"article_category_list":{"type":"LIST","fields":["id","spaceId","categoryName","categoryCode","status"],"required":false}},"tools":{"get_space_list":{"label":"查询内容空间","sideEffect":"NONE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}},"spaceName":{"required":false,"sources":["USER","MODEL"]},"spaceType":{"required":false,"enum":["WEBSITE","KNOWLEDGE","INTERNAL"],"sources":["USER","MODEL"]}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"space_list","path":"data","fields":["id","spaceName","spaceCode","spaceType","status"],"entity":{"type":"space","id":"id","name":"spaceName"}}]},"get_article_list":{"label":"查询文章","sideEffect":"NONE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}},"spaceId":{"required":false,"sources":["USER","EVIDENCE","PRIOR_TASK"]},"categoryId":{"required":false,"sources":["USER","EVIDENCE","PRIOR_TASK"]},"title":{"required":false,"sources":["USER","MODEL"]},"status":{"required":false,"enum":["DRAFT","PUBLISHED"],"sources":["USER","MODEL"]}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"article_list","path":"data","fields":["id","spaceId","categoryId","title","status","author","contentType"],"entity":{"type":"article","id":"id","name":"title"}}]},"get_article_page":{"label":"分页查询文章","sideEffect":"NONE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"article_page","path":"data.records","fields":["id","spaceId","categoryId","title","status","author","contentType"],"entity":{"type":"article","id":"id","name":"title"}}]},"get_article_detail":{"label":"查询文章详情","sideEffect":"NONE","args":{"id":{"sources":["EVIDENCE","PRIOR_TASK"],"missing":{"action":"CALL_TOOL","tool":"get_article_list"},"label":"文章 ID"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"article_detail","path":"data","fields":["id","spaceId","categoryId","title","summary","status","content","contentType","author"],"entity":{"type":"article","id":"id","name":"title"}}]},"post_article_save":{"label":"保存文章","sideEffect":"WRITE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}},"id":{"required":false,"sources":["EVIDENCE","PRIOR_TASK"],"label":"文章 ID"},"spaceId":{"sources":["EVIDENCE","PRIOR_TASK"],"missing":{"action":"CALL_TOOL","tool":"get_space_list","message":"先查询内容空间"},"label":"内容空间"},"categoryId":{"sources":["EVIDENCE","PRIOR_TASK"],"missing":{"action":"CALL_TOOL","tool":"get_article_category_list","message":"先查询文章分类"},"label":"文章分类"},"title":{"sources":["USER","MODEL"],"label":"文章标题"},"content":{"sources":["USER","MODEL"],"label":"正文"},"contentType":{"required":false,"enum":["MARKDOWN","HTML"],"sources":["USER","MODEL"],"label":"内容类型"},"status":{"required":false,"enum":["DRAFT","PUBLISHED"],"sources":["USER","MODEL"],"label":"状态"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"article_saved","path":"data","entity":{"type":"article","scalar":"id","name":"title"}}]},"delete_article_id":{"label":"删除文章","sideEffect":"WRITE","args":{"id":{"sources":["EVIDENCE","PRIOR_TASK"],"missing":{"action":"CALL_TOOL","tool":"get_article_list"},"label":"文章 ID"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"}},"get_article_category_list":{"label":"查询文章分类","sideEffect":"NONE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}},"spaceId":{"required":false,"sources":["USER","EVIDENCE","PRIOR_TASK"]},"categoryName":{"required":false,"sources":["USER","MODEL"]}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"article_category_list","path":"data","fields":["id","spaceId","categoryName","categoryCode","status"],"entity":{"type":"category","id":"id","name":"categoryName"}}]},"post_article_category_save":{"label":"保存文章分类","sideEffect":"WRITE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}},"id":{"required":false,"sources":["EVIDENCE","PRIOR_TASK"],"label":"分类 ID"},"spaceId":{"sources":["EVIDENCE","PRIOR_TASK"],"missing":{"action":"CALL_TOOL","tool":"get_space_list","message":"先查询内容空间"},"label":"内容空间"},"categoryName":{"sources":["USER","MODEL"],"label":"分类名称"},"categoryCode":{"sources":["USER","MODEL"],"label":"分类编码"},"status":{"required":false,"enum":["ENABLED","DISABLED"],"sources":["USER","MODEL"],"label":"状态"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"article_category_saved","path":"data","entity":{"type":"category","scalar":"id","name":"categoryName"}}]},"post_article_category_update_status":{"label":"变更文章分类状态","sideEffect":"WRITE","args":{"id":{"sources":["EVIDENCE","PRIOR_TASK"],"missing":{"action":"CALL_TOOL","tool":"get_article_category_list"},"label":"分类 ID"},"status":{"enum":["ENABLED","DISABLED"],"sources":["USER","MODEL"],"label":"目标状态"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"}},"delete_article_category_id":{"label":"删除文章分类","sideEffect":"WRITE","args":{"id":{"sources":["EVIDENCE","PRIOR_TASK"],"missing":{"action":"CALL_TOOL","tool":"get_article_category_list"},"label":"分类 ID"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"}},"post_space_save":{"label":"保存内容空间","sideEffect":"WRITE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}},"id":{"required":false,"sources":["EVIDENCE","PRIOR_TASK"],"label":"内容空间 ID"},"spaceName":{"sources":["USER","MODEL"],"label":"空间名称"},"spaceCode":{"sources":["USER","MODEL"],"label":"空间编码"},"spaceType":{"enum":["WEBSITE","KNOWLEDGE","INTERNAL"],"sources":["USER","MODEL"],"label":"空间类型"},"status":{"enum":["ENABLED","DISABLED"],"sources":["USER","MODEL"],"label":"状态"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"space_saved","path":"data","entity":{"type":"space","scalar":"id","name":"spaceName"}}]},"get_space_page":{"label":"分页查询内容空间","sideEffect":"NONE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"space_list","path":"data.records","fields":["id","spaceName","spaceCode","spaceType","status"],"entity":{"type":"space","id":"id","name":"spaceName"}}]},"get_article_category_page":{"label":"分页查询文章分类","sideEffect":"NONE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"article_category_list","path":"data.records","fields":["id","spaceId","categoryName","categoryCode","status"],"entity":{"type":"category","id":"id","name":"categoryName"}}]}}}',
  'ACTIVE', 'CMS 文章运营能力', 0, 0),
 
-(11003, 2, 'cms.page.lifecycle', '静态页面生命周期', 'PLATFORM',
+(11003, 2, 10001, 'cms.page.lifecycle', '静态页面生命周期', 'PLATFORM',
  '负责 CMS 页面（静态页）。本轮要求查询、创建、发布、撤回或删除页面时选用。不负责文章或导航栏目。',
  '## 目标
 完成本轮明确的静态页面查询或写入。
@@ -194,7 +175,7 @@ VALUES
  '{"mode":"REACT","delegatable":false,"outputs":{"space_list":{"type":"LIST","fields":["id","spaceName","spaceCode","spaceType","status"],"required":false},"page_list":{"type":"LIST","fields":["id","spaceId","pageName","pageCode","path","status","contentType"],"required":false},"page_page":{"type":"LIST","fields":["id","spaceId","pageName","pageCode","path","status","contentType"],"required":false}},"tools":{"get_space_list":{"label":"查询内容空间","sideEffect":"NONE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}},"spaceName":{"required":false,"sources":["USER","MODEL"]},"spaceType":{"required":false,"enum":["WEBSITE","KNOWLEDGE","INTERNAL"],"sources":["USER","MODEL"]}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"space_list","path":"data","fields":["id","spaceName","spaceCode","spaceType","status"],"entity":{"type":"space","id":"id","name":"spaceName"}}]},"get_page_list":{"label":"查询静态页面","sideEffect":"NONE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}},"spaceId":{"required":false,"sources":["USER","EVIDENCE","PRIOR_TASK"]},"pageName":{"required":false,"sources":["USER","MODEL"]},"path":{"required":false,"sources":["USER","MODEL"]},"status":{"required":false,"enum":["DRAFT","PUBLISHED"],"sources":["USER","MODEL"]}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"page_list","path":"data","fields":["id","spaceId","pageName","pageCode","path","status","contentType"],"entity":{"type":"page","id":"id","name":"pageName"}}]},"get_page_page":{"label":"分页查询静态页面","sideEffect":"NONE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"page_page","path":"data.records","fields":["id","spaceId","pageName","pageCode","path","status","contentType"],"entity":{"type":"page","id":"id","name":"pageName"}}]},"post_page_save":{"label":"保存静态页面","sideEffect":"WRITE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}},"id":{"required":false,"sources":["EVIDENCE","PRIOR_TASK"],"label":"页面 ID"},"spaceId":{"sources":["EVIDENCE","PRIOR_TASK"],"missing":{"action":"CALL_TOOL","tool":"get_space_list","message":"先查询内容空间"},"label":"内容空间"},"pageName":{"sources":["USER","MODEL"],"label":"页面名称"},"pageCode":{"required":false,"sources":["USER","MODEL"],"label":"页面编码"},"path":{"sources":["USER","MODEL"],"label":"访问路径"},"contentType":{"required":false,"enum":["MARKDOWN","HTML"],"sources":["USER","MODEL"],"label":"内容类型"},"status":{"required":false,"enum":["DRAFT","PUBLISHED"],"sources":["USER","MODEL"],"label":"状态"},"content":{"required":false,"sources":["USER","MODEL"],"label":"页面内容"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"page_saved","path":"data","entity":{"type":"page","scalar":"id","name":"pageName"}}]},"post_page_update_status":{"label":"变更静态页面状态","sideEffect":"WRITE","args":{"id":{"sources":["EVIDENCE","PRIOR_TASK"],"missing":{"action":"CALL_TOOL","tool":"get_page_list"},"label":"页面 ID"},"status":{"enum":["DRAFT","PUBLISHED"],"sources":["USER","MODEL"],"label":"目标状态"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"}},"delete_page_id":{"label":"删除静态页面","sideEffect":"WRITE","args":{"id":{"sources":["EVIDENCE","PRIOR_TASK"],"missing":{"action":"CALL_TOOL","tool":"get_page_list"},"label":"页面 ID"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"}},"post_space_save":{"label":"保存内容空间","sideEffect":"WRITE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}},"id":{"required":false,"sources":["EVIDENCE","PRIOR_TASK"],"label":"内容空间 ID"},"spaceName":{"sources":["USER","MODEL"],"label":"空间名称"},"spaceCode":{"sources":["USER","MODEL"],"label":"空间编码"},"spaceType":{"enum":["WEBSITE","KNOWLEDGE","INTERNAL"],"sources":["USER","MODEL"],"label":"空间类型"},"status":{"enum":["ENABLED","DISABLED"],"sources":["USER","MODEL"],"label":"状态"}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"space_saved","path":"data","entity":{"type":"space","scalar":"id","name":"spaceName"}}]},"get_space_page":{"label":"分页查询内容空间","sideEffect":"NONE","args":{"organId":{"from":"platform.organId","missing":{"action":"FAIL","message":"缺少机构上下文"}}},"success":{"path":"status","op":"EQ","value":200},"error":{"code":"errorCode","message":"errorMessage"},"extracts":[{"key":"space_list","path":"data.records","fields":["id","spaceName","spaceCode","spaceType","status"],"entity":{"type":"space","id":"id","name":"spaceName"}}]}}}',
  'ACTIVE', 'CMS 静态页运营能力', 0, 0),
 
-(11004, 2, 'cms.tagging.manage', '标签与文章打标', 'PLATFORM',
+(11004, 2, 10001, 'cms.tagging.manage', '标签与文章打标', 'PLATFORM',
  '负责 CMS 标签库及文章与标签的关系。本轮查询标签，或本轮明确要求创建标签、给文章打标。不负责文章正文、发布或导航。',
  '## 目标
 完成本轮的标签查询，或创建标签并建立文章关系。
@@ -214,18 +195,7 @@ VALUES
  'ACTIVE', 'CMS 标签打标能力', 0, 0);
 
 -- ---------------------------------------------
--- C. CMS Agent ↔ Skill 绑定
--- ---------------------------------------------
-INSERT INTO `agent_skill_binding`
-(`id`, `organ_id`, `agent_id`, `skill_id`, `enabled_flag`, `description`, `version`, `delete_flag`)
-VALUES
-(12001, 2, 10001, 11001, 1, NULL, 0, 0),
-(12002, 2, 10001, 11002, 1, NULL, 0, 0),
-(12003, 2, 10001, 11003, 1, NULL, 0, 0),
-(12004, 2, 10001, 11004, 1, NULL, 0, 0);
-
--- ---------------------------------------------
--- D. CMS Skill ↔ Tool 绑定（MCP EndpointStrategy 名）
+-- C. CMS Skill ↔ Tool 绑定（MCP EndpointStrategy 名）
 -- ---------------------------------------------
 INSERT INTO `skill_tool_binding`
 (`id`, `organ_id`, `skill_id`, `tool_name`, `enabled_flag`, `description`, `version`, `delete_flag`)
@@ -281,7 +251,7 @@ VALUES
 (13045, 2, 11004, 'get_article_list', 1, '打标技能按标题定位文章', 0, 0);
 
 -- ---------------------------------------------
--- E. CRM 模拟数字员工（CUSTOM，路由噪音）
+-- D. CRM 模拟数字员工（CUSTOM，路由噪音）
 -- ---------------------------------------------
 INSERT INTO `agent_profile`
 (`id`, `organ_id`, `agent_code`, `agent_name`, `resource_type`,
@@ -305,34 +275,25 @@ VALUES
  'ACTIVE', '测试噪音：模拟 CRM 客服 Agent', 0, 0);
 
 -- ---------------------------------------------
--- F. CRM 模拟 Skill（CUSTOM，路由/规划噪音）
+-- E. CRM 模拟 Skill（CUSTOM，路由/规划噪音）
 -- ---------------------------------------------
 INSERT INTO `skill_profile`
-(`id`, `organ_id`, `skill_key`, `skill_name`, `resource_type`, `semantic_desc`, `skill_manual`, `skill_contract`,
+(`id`, `organ_id`, `agent_id`, `skill_key`, `skill_name`, `resource_type`, `semantic_desc`, `skill_manual`, `skill_contract`,
  `status`, `description`, `version`, `delete_flag`)
 VALUES
-(21001, 2, 'crm.sales.pipeline', '销售漏斗与报价协同', 'CUSTOM',
+(21001, 2, 20001, 'crm.sales.pipeline', '销售漏斗与报价协同', 'CUSTOM',
  '当用户目标属于销售侧客户经营时选用：客户建档与检索、商机创建/推进、报价单查询与起草、跟进记录沉淀。用于「查客户」「推商机」「出报价」「记跟进」等意图。不处理售后工单，也不处理 CMS 文章/站点。本技能为联调噪音数据，无真实 CRM 后端时不得伪造成交或落库成功。',
  '## 目标\n联调噪音：模拟销售漏斗与报价协同，用于路由/规划区分 CMS。\n\n## 流程\n1. 确认客户/商机/报价标识后再给结论。\n2. 仅可调用身份类占位工具；无真实 CRM 下游时明确说明无法落库。\n\n## 禁止\n- 不伪造成交、报价单号或落库成功。\n- 不承接工单或 CMS 内容请求。',
  '{"mode":"PLAN","delegatable":false,"inputs":{"customerId":{"required":false,"from":"shared.customerId"},"opportunityId":{"required":false,"from":"shared.opportunityId"}},"outputs":{},"tools":{"g_builtin_identity_user":{"sideEffect":"NONE"},"g_builtin_identity_tenant":{"sideEffect":"NONE"}}}',
  'ACTIVE', '模拟 CRM 销售能力', 0, 0),
-(21002, 2, 'crm.service.ticket', '客服工单与服务历史', 'CUSTOM',
+(21002, 2, 20002, 'crm.service.ticket', '客服工单与服务历史', 'CUSTOM',
  '当用户目标属于售后服务时选用：工单创建/查询/状态更新，以及客户服务历史检索。用于投诉、故障报修、进度查询等意图。不承接销售报价或 CMS 内容运营。本技能为联调噪音数据，无真实下游时必须如实说明无法执行。',
  '## 目标\n联调噪音：模拟客服工单与服务历史，用于路由/规划区分销售与 CMS。\n\n## 流程\n1. 先定位工单号或客户标识。\n2. 仅可调用身份类占位工具；无真实下游时如实说明无法执行。\n\n## 禁止\n- 不伪造工单号或处理结果。\n- 不承接销售报价或 CMS 内容运营。',
  '{"mode":"PLAN","delegatable":false,"inputs":{"ticketId":{"required":false,"from":"shared.ticketId"},"customerId":{"required":false,"from":"shared.customerId"}},"outputs":{},"tools":{"g_builtin_identity_user":{"sideEffect":"NONE"},"g_builtin_identity_tenant":{"sideEffect":"NONE"}}}',
  'ACTIVE', '模拟 CRM 客服能力', 0, 0);
 
 -- ---------------------------------------------
--- G. CRM Agent ↔ Skill 绑定
--- ---------------------------------------------
-INSERT INTO `agent_skill_binding`
-(`id`, `organ_id`, `agent_id`, `skill_id`, `enabled_flag`, `description`, `version`, `delete_flag`)
-VALUES
-(22001, 2, 20001, 21001, 1, NULL, 0, 0),
-(22002, 2, 20002, 21002, 1, NULL, 0, 0);
-
--- ---------------------------------------------
--- H. CRM Skill ↔ Tool 绑定（内置身份工具，保证 Bundle 可加载）
+-- F. CRM Skill ↔ Tool 绑定（内置身份工具，保证 Bundle 可加载）
 -- ---------------------------------------------
 INSERT INTO `skill_tool_binding`
 (`id`, `organ_id`, `skill_id`, `tool_name`, `enabled_flag`, `description`, `version`, `delete_flag`)

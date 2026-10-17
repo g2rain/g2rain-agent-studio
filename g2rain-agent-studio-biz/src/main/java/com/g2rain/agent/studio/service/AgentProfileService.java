@@ -2,6 +2,7 @@ package com.g2rain.agent.studio.service;
 
 import com.g2rain.agent.studio.dto.AgentProfileDto;
 import com.g2rain.agent.studio.dto.AgentProfileSelectDto;
+import com.g2rain.agent.studio.dto.UpdateStatusDto;
 import com.g2rain.agent.studio.vo.AgentBundleVo;
 import com.g2rain.agent.studio.vo.AgentCatalogItemVo;
 import com.g2rain.agent.studio.vo.AgentOptionVo;
@@ -29,6 +30,14 @@ public interface AgentProfileService {
     List<AgentProfileVo> selectList(AgentProfileSelectDto selectDto);
 
     /**
+     * 平台智能体列表：固定 PLATFORM，不按机构隔离。
+     *
+     * @param selectDto 查询条件 DTO
+     * @return VO 对象列表
+     */
+    List<AgentProfileVo> selectPlatformList(AgentProfileSelectDto selectDto);
+
+    /**
      * 查询 ACTIVE 数字员工目录（PLATFORM 不隔离 + CUSTOM 本租户）。
      *
      * @return ACTIVE Agent 摘要列表
@@ -51,10 +60,10 @@ public interface AgentProfileService {
     AgentCatalogItemVo resolveProfile(Long agentId);
 
     /**
-     * 按 agentId 查询绑定 Skill 短目录（不含手册 / 契约 / tools）。
+     * 按 agentId 查询 ACTIVE Skill 短目录（不含手册 / 契约 / tools）。
      *
      * @param agentId 数字员工标识
-     * @return Skill 短目录；无绑定为空列表
+     * @return Skill 短目录；无技能为空列表
      */
     List<SkillDigestVo> selectSkillDigest(Long agentId);
 
@@ -62,7 +71,7 @@ public interface AgentProfileService {
      * 按 agentId 查询能力包：Skill（手册/契约）+ 其下 Tool 列表。
      *
      * @param agentId 数字员工标识
-     * @return 能力包；无绑定时 skills 为空列表
+     * @return 能力包；无技能时 skills 为空列表
      */
     AgentBundleVo selectCapabilityBundle(Long agentId);
 
@@ -73,6 +82,14 @@ public interface AgentProfileService {
      * @return 分页 VO 数据
      */
     PageData<AgentProfileVo> selectPage(PageSelectListDto<AgentProfileSelectDto> selectDto);
+
+    /**
+     * 平台智能体分页：固定 PLATFORM，不按机构隔离。
+     *
+     * @param selectDto 查询条件DTO（包含分页参数）
+     * @return 分页 VO 数据
+     */
+    PageData<AgentProfileVo> selectPlatformPage(PageSelectListDto<AgentProfileSelectDto> selectDto);
 
     /**
      * 新增或更新数据
@@ -89,4 +106,13 @@ public interface AgentProfileService {
      * @return 操作结果（影响行数）
      */
     int delete(Long id);
+
+    /**
+     * 仅修改状态。
+     *
+     * @param id  主键
+     * @param dto 状态
+     * @return 影响行数
+     */
+    int updateStatus(Long id, UpdateStatusDto dto);
 }

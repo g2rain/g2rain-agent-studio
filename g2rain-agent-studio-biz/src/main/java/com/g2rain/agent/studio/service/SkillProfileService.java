@@ -2,6 +2,7 @@ package com.g2rain.agent.studio.service;
 
 import com.g2rain.agent.studio.dto.SkillProfileDto;
 import com.g2rain.agent.studio.dto.SkillProfileSelectDto;
+import com.g2rain.agent.studio.dto.UpdateStatusDto;
 import com.g2rain.agent.studio.vo.SkillProfileVo;
 import com.g2rain.common.model.PageData;
 import com.g2rain.common.model.PageSelectListDto;
@@ -47,4 +48,13 @@ public interface SkillProfileService {
      * @return 操作结果（影响行数）
      */
     int delete(Long id);
+
+    /**
+     * 仅修改状态。
+     *
+     * @param id  主键
+     * @param dto 状态
+     * @return 影响行数
+     */
+    int updateStatus(Long id, UpdateStatusDto dto);
 }

@@ -51,6 +51,14 @@ public interface SkillProfileDao {
     int delete(Long id);
 
     /**
+     * 按智能体删除其下技能。
+     *
+     * @param agentId 智能体标识
+     * @return 影响行数
+     */
+    int deleteByAgentId(Long agentId);
+
+    /**
      * 根据ID和Version更新记录（乐观锁更新）
      *
      * @param entity 实体对象（必须包含version字段）
