@@ -47,13 +47,6 @@ public class SkillToolBindingDto extends BaseDto {
     private String toolName;
 
     /**
-     * 是否启用[0:否, 1:是]
-     */
-    @NotNull(groups = CreateGroup.class)
-    @Schema(description = "是否启用[0:否, 1:是]（新增必填）")
-    private Byte enabledFlag;
-
-    /**
      * 备注
      */
     @Size(max = 500)
