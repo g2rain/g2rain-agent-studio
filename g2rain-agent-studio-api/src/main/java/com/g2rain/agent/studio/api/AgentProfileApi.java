@@ -28,14 +28,24 @@ import java.util.List;
 public interface AgentProfileApi {
 
     /**
-     * 根据条件查询列表
+     * 查询自建智能体列表（服务端写死 resourceType=CUSTOM）。
      *
      * @param selectDto 查询条件 DTO
      * @return 数据列表
      */
-    @GetMapping("/list")
-    @Operation(summary = "查询数字员工画像表列表", description = "根据查询条件返回数字员工画像表列表")
-    Result<List<AgentProfileVo>> selectList(AgentProfileSelectDto selectDto);
+    @GetMapping("/custom/list")
+    @Operation(summary = "查询自建智能体列表", description = "resourceType 由服务端固定为 CUSTOM，客户端传值无效")
+    Result<List<AgentProfileVo>> selectCustomList(AgentProfileSelectDto selectDto);
+
+    /**
+     * 查询平台智能体列表（服务端写死 resourceType=PLATFORM）。
+     *
+     * @param selectDto 查询条件 DTO
+     * @return 数据列表
+     */
+    @GetMapping("/platform/list")
+    @Operation(summary = "查询平台智能体列表", description = "resourceType 由服务端固定为 PLATFORM，客户端传值无效")
+    Result<List<AgentProfileVo>> selectPlatformList(AgentProfileSelectDto selectDto);
 
     /**
      * 查询 ACTIVE 数字员工目录（PLATFORM 不隔离 + CUSTOM 本租户），供意图选人候选。
@@ -71,7 +81,7 @@ public interface AgentProfileApi {
     Result<AgentCatalogItemVo> resolveProfile(@Parameter(description = "数字员工标识") @PathVariable("agentId") Long agentId);
 
     /**
-     * 按 agentId 查询绑定 Skill 短目录（不含手册 / 契约 / tools），供意图 prompt。
+     * 按 agentId 查询 ACTIVE Skill 短目录（不含手册 / 契约 / tools），供意图 prompt。
      *
      * @param agentId 数字员工标识
      * @return Skill 短目录列表
@@ -93,12 +103,22 @@ public interface AgentProfileApi {
     Result<AgentBundleVo> selectCapabilityBundle(@Parameter(description = "数字员工标识") @PathVariable("agentId") Long agentId);
 
     /**
-     * 根据条件分页查询
+     * 分页查询自建智能体（服务端写死 resourceType=CUSTOM）。
      *
      * @param selectDto 查询条件DTO（包含分页参数）
      * @return 分页数据
      */
-    @GetMapping("/page")
-    @Operation(summary = "分页查询数字员工画像表列表", description = "分页查询数字员工画像表列表")
-    Result<PageData<AgentProfileVo>> selectPage(PageSelectListDto<AgentProfileSelectDto> selectDto);
+    @GetMapping("/custom/page")
+    @Operation(summary = "分页查询自建智能体", description = "resourceType 由服务端固定为 CUSTOM，客户端传值无效")
+    Result<PageData<AgentProfileVo>> selectCustomPage(PageSelectListDto<AgentProfileSelectDto> selectDto);
+
+    /**
+     * 分页查询平台智能体（服务端写死 resourceType=PLATFORM）。
+     *
+     * @param selectDto 查询条件DTO（包含分页参数）
+     * @return 分页数据
+     */
+    @GetMapping("/platform/page")
+    @Operation(summary = "分页查询平台智能体", description = "resourceType 由服务端固定为 PLATFORM，客户端传值无效")
+    Result<PageData<AgentProfileVo>> selectPlatformPage(PageSelectListDto<AgentProfileSelectDto> selectDto);
 }

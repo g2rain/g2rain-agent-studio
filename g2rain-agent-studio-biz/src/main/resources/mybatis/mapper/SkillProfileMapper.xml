@@ -12,6 +12,7 @@
         <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
         <!-- 业务字段（其他自定义字段） -->
         <result column="organ_id" property="organId" jdbcType="BIGINT"/>
+        <result column="agent_id" property="agentId" jdbcType="BIGINT"/>
         <result column="skill_key" property="skillKey" jdbcType="VARCHAR"/>
         <result column="skill_name" property="skillName" jdbcType="VARCHAR"/>
         <result column="resource_type" property="resourceType" jdbcType="VARCHAR"/>
@@ -55,6 +56,10 @@
                         organ_id
                         <include refid="directionClause"/>
                     </when>
+                    <when test="item.column == 'agentId'">
+                        agent_id
+                        <include refid="directionClause"/>
+                    </when>
                     <when test="item.column == 'skillKey'">
                         skill_key
                         <include refid="directionClause"/>
@@ -92,7 +97,7 @@
         <!-- 基础字段 -->
         create_time, update_time,
         <!-- 业务字段 -->
-        organ_id, skill_key, skill_name, resource_type, semantic_desc, skill_manual, skill_contract, status, description,
+        organ_id, agent_id, skill_key, skill_name, resource_type, semantic_desc, skill_manual, skill_contract, status, description,
         <!-- deleteFlag字段（如果存在） -->
         delete_flag,
         <!-- version字段（如果存在） -->
@@ -103,7 +108,7 @@
         <!-- 基础字段值 -->
         #{createTime, jdbcType=TIMESTAMP}, #{updateTime, jdbcType=TIMESTAMP},
         <!-- 业务字段值 -->
-        #{organId, jdbcType=BIGINT}, #{skillKey, jdbcType=VARCHAR}, #{skillName, jdbcType=VARCHAR}, #{resourceType, jdbcType=VARCHAR}, #{semanticDesc, jdbcType=VARCHAR}, #{skillManual, jdbcType=LONGVARCHAR}, #{skillContract, jdbcType=OTHER}, #{status, jdbcType=VARCHAR}, #{description, jdbcType=VARCHAR},
+        #{organId, jdbcType=BIGINT}, #{agentId, jdbcType=BIGINT}, #{skillKey, jdbcType=VARCHAR}, #{skillName, jdbcType=VARCHAR}, #{resourceType, jdbcType=VARCHAR}, #{semanticDesc, jdbcType=VARCHAR}, #{skillManual, jdbcType=LONGVARCHAR}, #{skillContract, jdbcType=OTHER}, #{status, jdbcType=VARCHAR}, #{description, jdbcType=VARCHAR},
         <!-- deleteFlag字段值（如果存在，设置默认值为0） -->
         0,
         <!-- version字段值（如果存在，设置默认值为0） -->
@@ -122,6 +127,9 @@
             <!-- 业务字段更新 -->
             <if test="organId != null">
                 organ_id = #{organId, jdbcType=BIGINT},
+            </if>
+            <if test="agentId != null">
+                agent_id = #{agentId, jdbcType=BIGINT},
             </if>
             <if test="skillKey != null">
                 skill_key = #{skillKey, jdbcType=VARCHAR},
@@ -161,7 +169,7 @@
         <!-- 基础字段 -->
         create_time, update_time,
         <!-- 业务字段 -->
-        organ_id, skill_key, skill_name, resource_type, semantic_desc, skill_manual, skill_contract, status, description,
+        organ_id, agent_id, skill_key, skill_name, resource_type, semantic_desc, skill_manual, skill_contract, status, description,
         <!-- deleteFlag字段（如果存在） -->
         delete_flag,
         <!-- version字段（如果存在） -->
@@ -180,7 +188,7 @@
         <!-- 基础字段 -->
         create_time, update_time,
         <!-- 业务字段 -->
-        organ_id, skill_key, skill_name, resource_type, semantic_desc, skill_manual, skill_contract, status, description,
+        organ_id, agent_id, skill_key, skill_name, resource_type, semantic_desc, skill_manual, skill_contract, status, description,
         <!-- deleteFlag字段（如果存在） -->
         delete_flag,
         <!-- version字段（如果存在） -->
@@ -225,6 +233,9 @@
             <!-- 业务字段筛选 -->
             <if test="organId != null">
                 AND organ_id = #{organId, jdbcType=BIGINT}
+            </if>
+            <if test="agentId != null">
+                AND agent_id = #{agentId, jdbcType=BIGINT}
             </if>
             <if test="skillKey != null">
                 AND skill_key = #{skillKey, jdbcType=VARCHAR}
@@ -294,6 +305,9 @@
             <if test="organId != null">
                 AND organ_id = #{organId, jdbcType=BIGINT}
             </if>
+            <if test="agentId != null">
+                AND agent_id = #{agentId, jdbcType=BIGINT}
+            </if>
             <if test="skillKey != null">
                 AND skill_key = #{skillKey, jdbcType=VARCHAR}
             </if>
@@ -332,7 +346,7 @@
         <!-- 基础字段 -->
         create_time, update_time,
         <!-- 业务字段 -->
-        organ_id, skill_key, skill_name, resource_type, semantic_desc, skill_manual, skill_contract, status, description,
+        organ_id, agent_id, skill_key, skill_name, resource_type, semantic_desc, skill_manual, skill_contract, status, description,
         <!-- deleteFlag字段（如果存在） -->
         delete_flag,
         <!-- version字段（如果存在） -->
@@ -370,6 +384,9 @@
             <!-- 业务字段更新 -->
             <if test="organId != null">
                 organ_id = #{organId, jdbcType=BIGINT},
+            </if>
+            <if test="agentId != null">
+                agent_id = #{agentId, jdbcType=BIGINT},
             </if>
             <if test="skillKey != null">
                 skill_key = #{skillKey, jdbcType=VARCHAR},
@@ -410,6 +427,13 @@
         </set>
         WHERE id = #{id, jdbcType=BIGINT}
         <!-- 只删除未删除的记录 -->
+        AND (delete_flag = 0 OR delete_flag IS NULL)
+    </update>
+
+    <update id="deleteByAgentId" parameterType="Long">
+        UPDATE skill_profile
+        SET delete_flag = 1, version = version + 1
+        WHERE agent_id = #{agentId, jdbcType=BIGINT}
         AND (delete_flag = 0 OR delete_flag IS NULL)
     </update>
 

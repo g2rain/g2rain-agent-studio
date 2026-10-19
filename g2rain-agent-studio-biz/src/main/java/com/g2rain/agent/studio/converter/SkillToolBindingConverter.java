@@ -41,6 +41,7 @@ public interface SkillToolBindingConverter {
      */
     @Mapping(target = "version", ignore = true)
     @Mapping(target = "deleteFlag", ignore = true)
+    @Mapping(target = "enabledFlag", ignore = true)
     @Mapping(target = "createTime", source = "createTime", qualifiedByName = "stringToLocalDateTime")
     @Mapping(target = "updateTime", source = "updateTime", qualifiedByName = "stringToLocalDateTime")
     SkillToolBindingPo dto2po(SkillToolBindingDto dto);

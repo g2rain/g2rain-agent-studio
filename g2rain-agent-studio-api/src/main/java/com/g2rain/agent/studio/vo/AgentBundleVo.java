@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Agent 能力包：绑定 Skill 及其 Tool（不含人设），供 hydrate / 执行。
+ * Agent 能力包：所属 Skill 及其 Tool（不含人设），供 hydrate / 执行。
  */
 @Getter
 @Setter
