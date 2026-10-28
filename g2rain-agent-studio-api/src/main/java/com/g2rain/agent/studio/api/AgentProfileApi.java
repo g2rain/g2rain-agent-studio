@@ -76,8 +76,7 @@ public interface AgentProfileApi {
      * @return 画像摘要（含 status）；不存在为 null
      */
     @GetMapping("/{agentId}/resolve")
-    @Operation(summary = "解析数字员工画像", hidden = true,
-        description = "按 id 返回画像含 status；CUSTOM 租户隔离，PLATFORM 不隔离；不存在返回空")
+    @Operation(summary = "解析数字员工画像", description = "按 id 返回画像含 status；CUSTOM 租户隔离，PLATFORM 不隔离；不存在返回空")
     Result<AgentCatalogItemVo> resolveProfile(@Parameter(description = "数字员工标识") @PathVariable("agentId") Long agentId);
 
     /**
