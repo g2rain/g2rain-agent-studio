@@ -79,6 +79,7 @@ public class ChatPromptTemplateServiceImpl implements ChatPromptTemplateService 
         if (Objects.isNull(id) || id == 0) {
             // 新增：使用IdGenerator生成主键
             entity.setId(idGenerator.generateId());
+            entity.setStatus(ResourceStatus.INACTIVE.name());
             LocalDateTime now = Moments.now();
             entity.setUpdateTime(now);
             entity.setCreateTime(now);

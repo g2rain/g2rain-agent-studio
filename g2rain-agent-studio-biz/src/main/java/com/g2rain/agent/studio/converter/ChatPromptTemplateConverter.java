@@ -38,9 +38,11 @@ public interface ChatPromptTemplateConverter {
      * 自动将 createTime 和 updateTime 从 {@link String} 转换为 {@link LocalDateTime}
      * 忽略 version 字段
      * 忽略 deleteFlag 字段
+     * 忽略 status 字段，状态仅通过状态切换接口修改
      */
     @Mapping(target = "version", ignore = true)
     @Mapping(target = "deleteFlag", ignore = true)
+    @Mapping(target = "status", ignore = true)
     @Mapping(target = "createTime", source = "createTime", qualifiedByName = "stringToLocalDateTime")
     @Mapping(target = "updateTime", source = "updateTime", qualifiedByName = "stringToLocalDateTime")
     ChatPromptTemplatePo dto2po(ChatPromptTemplateDto dto);
