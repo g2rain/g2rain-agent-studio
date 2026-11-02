@@ -63,11 +63,8 @@ jobs:
             echo "commit=${RELEASE_COMMIT}"
           } >> "${GITHUB_OUTPUT}"
 
-      - name: Run the complete Maven build and tests
-        run: mvn --batch-mode clean verify
-
-      - name: Install verified Reactor artifacts for the Jib module build
-        run: mvn --batch-mode -DskipTests install
+      - name: Build and test all modules
+        run: mvn --batch-mode --no-transfer-progress clean install
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -77,17 +74,19 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push both immutable release tags with Jib
+        working-directory: g2rain-agent-studio-startup
         env:
-          IMAGE: ghcr.io/g2rain/g2rain-agent-studio
-          VERSION: ${{ steps.release.outputs.version }}
-          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}
-        shell: bash
+          IMAGE_NAME: ghcr.io/g2rain/g2rain-agent-studio
+          IMAGE_TAG: ${{ steps.release.outputs.version }}
+          EXTRA_TAGS: sha-${{ steps.release.outputs.commit }}
         run: |
-          set -euo pipefail
-          # Select the startup POM explicitly, independently of the working directory.
-          mvn --batch-mode -f g2rain-agent-studio-startup/pom.xml -DskipTests compile jib:build \
-            -Djib.to.image="${IMAGE}:${VERSION}" \
-            -Djib.to.tags="sha-${RELEASE_COMMIT}"
+          args=()
+          if [[ -n "$EXTRA_TAGS" ]]; then
+            args+=("-Djib.to.tags=$EXTRA_TAGS")
+          fi
+          mvn --batch-mode --no-transfer-progress -DskipTests=true compile jib:build \
+            "-Djib.to.image=$IMAGE_NAME:$IMAGE_TAG" \
+            "${args[@]}"
 
       - name: Report successful publication
         env:
