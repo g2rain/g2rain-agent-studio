@@ -10,6 +10,13 @@ permissions:
   packages: write
 
 jobs:
+  publish-maven:
+    needs: publish
+    uses: ./.github/workflows/publish-maven.yml
+    permissions:
+      contents: read
+      packages: write
+
   publish:
     name: Verify and publish release image
     runs-on: ubuntu-latest
