@@ -1,5 +1,13 @@
 # 构建、镜像与部署
 
+## API Maven 包
+
+工作流 `.github/workflows/publish-maven.yml` 支持 Actions 页面手动运行（选择 `main` 或已进入 `main` 历史的 ref），也会在 GHCR 工作流成功推送镜像后自动调用。发布地址为 `https://maven.pkg.github.com/g2rain/g2rain-agent-studio`；使用 `GITHUB_TOKEN`，不需要新增发布 PAT Secret。
+
+命令选择 `-pl g2rain-agent-studio-api -am clean deploy`，仅构建、测试并发布根父 POM 与 API JAR（含 sources），不发布 Biz 或 Startup。项目版本沿用根 POM 的 `revision`。固定版本发布后不应覆盖；如重复发布返回冲突，请检查已有包版本并按版本策略升级。镜像成功与 Maven 包成功分别查看对应 job，Maven 包失败不会撤回已推送镜像。
+
+Agent Runtime 可添加仓库地址及依赖 `com.g2rain:g2rain-agent-studio-api:1.0.0`。消费者 Maven settings 中仓库同名 server 需配置 GitHub Packages 读取凭据；跨仓库 Actions 使用 Runtime 的 `GITHUB_TOKEN` 时，需要在包设置授予 Runtime 仓库读取权限，并遵循组织 Packages 策略。需要个人读取凭据时使用具有 `read:packages` 的 PAT classic，安全注入 settings，禁止提交 Token。GitHub Maven Packages 的读取认证与 GHCR Public 匿名拉取不同。
+
 Agent Studio 是 G2rain 平台中保存 Agent、Skill 和绑定资料的领域服务；它不替代 Runtime 的任务执行、MCP Registry 的工具注册或平台的 Gateway/IAM。完整平台的在线演示属于 G2rain 平台，不是本组件的独立部署验证。
 
 ## 本地构建和测试
