@@ -1,0 +1,40 @@
+schemaVersion: 1
+name: g2rain-agent-studio
+family: business-service
+role: Agent、Skill 与工具绑定的配置管理服务
+language: Java
+buildTool: Maven
+architectureBaseline:
+  repository: https://github.com/g2rain/g2rain
+  ref: architecture-v1.0.0
+  profile: docs/architecture/profiles/java-domain-service
+  version: 1.0.0
+  status: planned
+  deviations: docs/architecture/deviations.md
+ownership:
+  owns: [Agent 画像, Skill 定义与执行契约, Agent-Skill 绑定, Skill-Tool 绑定]
+  excludes: [Agent 对话执行与恢复, MCP 服务与工具注册, 模型供应商接入, 网关鉴权与部署编排]
+modules:
+  - {name: g2rain-agent-studio-api, path: g2rain-agent-studio-api, role: 查询与能力包契约, mayDependOn: []}
+  - {name: g2rain-agent-studio-biz, path: g2rain-agent-studio-biz, role: 配置领域、接口与持久化, mayDependOn: [g2rain-agent-studio-api]}
+  - {name: g2rain-agent-studio-startup, path: g2rain-agent-studio-startup, role: Spring Boot 运行时组装, mayDependOn: [g2rain-agent-studio-biz]}
+runtime:
+  mainClass: com.g2rain.agent.studio.Application
+  defaultPort: 8080
+  defaultProfile: nacos
+  minimumVersions: {java: "25", mysql: "8.0.13"}
+  dependencies: [MySQL, Redis, Nacos]
+commands:
+  verify: mvn clean verify
+  run: mvn -pl g2rain-agent-studio-startup -am spring-boot:run
+  codegen: mvn g2rain-crafter:bootstrap
+  image: ./build.sh <tag>
+validation:
+  lastVerifiedAt: null
+  command: mvn clean verify
+  result: not-run
+  note: 文档初始化未运行构建；需要具备依赖与基础设施的环境验证。
+documentation:
+  entry: docs/index.md
+  architecture: docs/architecture/overview.md
+  decisions: docs/decisions
