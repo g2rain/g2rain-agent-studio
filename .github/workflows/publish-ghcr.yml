@@ -77,7 +77,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push both immutable release tags with Jib
-        working-directory: g2rain-agent-studio-startup
         env:
           IMAGE: ghcr.io/g2rain/g2rain-agent-studio
           VERSION: ${{ steps.release.outputs.version }}
@@ -85,9 +84,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Jib is configured only in this module; invoke it from the module
-          # after the verified Reactor artifacts have been installed above.
-          mvn --batch-mode -DskipTests compile jib:build \
+          # Select the startup POM explicitly, independently of the working directory.
+          mvn --batch-mode -f g2rain-agent-studio-startup/pom.xml -DskipTests compile jib:build \
             -Djib.to.image="${IMAGE}:${VERSION}" \
             -Djib.to.tags="sha-${RELEASE_COMMIT}"
 
