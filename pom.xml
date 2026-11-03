@@ -21,6 +21,16 @@
         Visual development studio for building, configuring, and managing AI Agents.
     </description>
 
+    <!-- Project metadata follows the G2rain Maven component convention. -->
+    <url>https://github.com/g2rain/g2rain-agent-studio</url>
+
+    <scm>
+        <url>https://github.com/g2rain/g2rain-agent-studio</url>
+        <connection>scm:git:https://github.com/g2rain/g2rain-agent-studio.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/g2rain/g2rain-agent-studio.git</developerConnection>
+        <tag>HEAD</tag>
+    </scm>
+
     <licenses>
         <license>
             <name>Apache License, Version 2.0</name>

@@ -1,0 +1,110 @@
+name: Publish GHCR image
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish-maven:
+    needs: publish
+    uses: ./.github/workflows/publish-maven.yml
+    permissions:
+      contents: read
+      packages: write
+
+  publish:
+    name: Verify and publish release image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Validate release tag, branch, notes, and project version
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_NAME="${GITHUB_REF_NAME}"
+          if [[ ! "${TAG_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Refusing non-stable release tag: ${TAG_NAME}" >&2
+            exit 1
+          fi
+
+          VERSION="${TAG_NAME#v}"
+          RELEASE_COMMIT="$(git rev-list -n 1 "${GITHUB_REF}")"
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "${RELEASE_COMMIT}" origin/main; then
+            echo "Release tag ${TAG_NAME} (${RELEASE_COMMIT}) is not contained in origin/main." >&2
+            exit 1
+          fi
+
+          RELEASE_NOTE="docs/releases/v${VERSION}.md"
+          if ! git cat-file -e "${RELEASE_COMMIT}:${RELEASE_NOTE}" 2>/dev/null || \
+              [[ -z "$(git show "${RELEASE_COMMIT}:${RELEASE_NOTE}")" ]]; then
+            echo "Missing or empty release note at ${RELEASE_NOTE} in the tagged commit." >&2
+            exit 1
+          fi
+
+          PROJECT_VERSION="$(mvn --batch-mode --quiet -Dstyle.color=never -DforceStdout help:evaluate -Dexpression=project.version)"
+          if [[ "${PROJECT_VERSION}" != "${VERSION}" ]]; then
+            echo "Tag ${TAG_NAME} does not match Maven project version ${PROJECT_VERSION}." >&2
+            exit 1
+          fi
+
+          {
+            echo "version=${VERSION}"
+            echo "commit=${RELEASE_COMMIT}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Build and test all modules
+        run: mvn --batch-mode --no-transfer-progress clean install
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push both immutable release tags with Jib
+        working-directory: g2rain-agent-studio-startup
+        env:
+          IMAGE_NAME: ghcr.io/g2rain/g2rain-agent-studio
+          IMAGE_TAG: ${{ steps.release.outputs.version }}
+          EXTRA_TAGS: sha-${{ steps.release.outputs.commit }}
+        run: |
+          args=()
+          if [[ -n "$EXTRA_TAGS" ]]; then
+            args+=("-Djib.to.tags=$EXTRA_TAGS")
+          fi
+          mvn --batch-mode --no-transfer-progress -DskipTests=true compile jib:build \
+            "-Djib.to.image=$IMAGE_NAME:$IMAGE_TAG" \
+            "${args[@]}"
+
+      - name: Report successful publication
+        env:
+          IMAGE: ghcr.io/g2rain/g2rain-agent-studio
+          VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}
+        shell: bash
+        run: |
+          {
+            echo "## GHCR publication succeeded"
+            echo
+            echo "- \`${IMAGE}:${VERSION}\`"
+            echo "- \`${IMAGE}:sha-${RELEASE_COMMIT}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
