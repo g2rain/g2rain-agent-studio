@@ -21,6 +21,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.annotation.Resource;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -113,6 +114,13 @@ public class AgentProfileController implements AgentProfileApi {
         OwnerGuard.requireOperator();
         dto.setResourceType(ResourceType.PLATFORM.name());
         return Result.success(agentProfileService.save(dto));
+    }
+
+    @GetMapping("/{agentId}/name")
+    @IdentityInject(organIdPropertyName = "organId")
+    @Operation(summary = "查询智能体名称", description = "按 id 返回名称，不按会话类型过滤；CUSTOM 租户隔离，PLATFORM 不隔离；不存在返回空")
+    public Result<String> selectAgentName(@Parameter(description = "数字员工标识") @PathVariable("agentId") Long agentId) {
+        return Result.success(agentProfileService.selectAgentName(agentId));
     }
 
     @PostMapping("/{id}/status")
