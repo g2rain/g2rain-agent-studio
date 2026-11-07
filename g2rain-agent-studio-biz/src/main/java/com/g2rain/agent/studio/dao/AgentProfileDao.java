@@ -126,4 +126,21 @@ public interface AgentProfileDao {
      */
     @IgnoreIsolation
     List<AgentProfilePo> selectOptionsListWithoutIsolation(AgentProfileSelectDto selectDto);
+
+    /**
+     * 按条件查询当前会话可访问的画像（目录 / 入口校验字段），本租户隔离。
+     *
+     * @param selectDto 查询条件 DTO（须设置 sessionType）
+     * @return 画像 PO 列表
+     */
+    List<AgentProfilePo> selectAccessibleList(AgentProfileSelectDto selectDto);
+
+    /**
+     * 按条件查询当前会话可访问的画像（目录 / 入口校验字段），忽略数据隔离。
+     *
+     * @param selectDto 查询条件 DTO（须设置 sessionType）
+     * @return 画像 PO 列表
+     */
+    @IgnoreIsolation
+    List<AgentProfilePo> selectAccessibleListWithoutIsolation(AgentProfileSelectDto selectDto);
 }

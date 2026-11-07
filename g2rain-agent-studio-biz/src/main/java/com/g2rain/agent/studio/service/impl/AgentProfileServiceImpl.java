@@ -2,6 +2,7 @@ package com.g2rain.agent.studio.service.impl;
 
 import com.g2rain.agent.studio.converter.AgentProfileConverter;
 import com.g2rain.agent.studio.dao.AgentProfileDao;
+import com.g2rain.agent.studio.dao.AgentSessionBindingDao;
 import com.g2rain.agent.studio.dao.SkillProfileDao;
 import com.g2rain.agent.studio.dao.SkillToolBindingDao;
 import com.g2rain.agent.studio.dao.po.AgentProfilePo;
@@ -9,10 +10,9 @@ import com.g2rain.agent.studio.dao.po.SkillProfilePo;
 import com.g2rain.agent.studio.dao.po.SkillToolBindingPo;
 import com.g2rain.agent.studio.dto.AgentProfileDto;
 import com.g2rain.agent.studio.dto.AgentProfileSelectDto;
-import com.g2rain.agent.studio.dto.UpdateStatusDto;
-import com.g2rain.agent.studio.enums.ResourceStatus;
 import com.g2rain.agent.studio.dto.SkillProfileSelectDto;
 import com.g2rain.agent.studio.dto.SkillToolBindingSelectDto;
+import com.g2rain.agent.studio.dto.UpdateStatusDto;
 import com.g2rain.agent.studio.enums.EnabledFlag;
 import com.g2rain.agent.studio.enums.ResourceStatus;
 import com.g2rain.agent.studio.enums.ResourceType;
@@ -23,6 +23,7 @@ import com.g2rain.agent.studio.vo.AgentOptionVo;
 import com.g2rain.agent.studio.vo.AgentProfileVo;
 import com.g2rain.agent.studio.vo.SkillDigestVo;
 import com.g2rain.common.concurrent.ContextExecutors;
+import com.g2rain.common.enums.SessionType;
 import com.g2rain.common.exception.SystemErrorCode;
 import com.g2rain.common.id.IdGenerator;
 import com.g2rain.common.model.PageData;
@@ -31,6 +32,7 @@ import com.g2rain.common.utils.Asserts;
 import com.g2rain.common.utils.Collections;
 import com.g2rain.common.utils.Moments;
 import com.g2rain.common.validation.Validations;
+import com.g2rain.common.web.PrincipalContextHolder;
 import com.g2rain.mybatis.pagination.PageContext;
 import com.g2rain.mybatis.pagination.model.Page;
 import jakarta.annotation.Resource;
@@ -67,6 +69,9 @@ public class AgentProfileServiceImpl implements AgentProfileService {
 
     @Resource(name = "skillProfileDao")
     private SkillProfileDao skillProfileDao;
+
+    @Resource(name = "agentSessionBindingDao")
+    private AgentSessionBindingDao agentSessionBindingDao;
 
     private IdGenerator idGenerator;
 
@@ -105,18 +110,21 @@ public class AgentProfileServiceImpl implements AgentProfileService {
      */
     @Override
     public List<AgentCatalogItemVo> selectActiveCatalog() {
+        String sessionType = currentSessionType();
         return Stream.of(
                 ContextExecutors.callVirtual(() -> {
                     AgentProfileSelectDto select = new AgentProfileSelectDto();
                     select.setResourceType(ResourceType.PLATFORM.name());
                     select.setStatus(ResourceStatus.ACTIVE.name());
-                    return agentProfileDao.selectListWithoutIsolation(select);
+                    select.setSessionType(sessionType);
+                    return agentProfileDao.selectAccessibleListWithoutIsolation(select);
                 }),
                 ContextExecutors.callVirtual(() -> {
                     AgentProfileSelectDto select = new AgentProfileSelectDto();
                     select.setResourceType(ResourceType.CUSTOM.name());
                     select.setStatus(ResourceStatus.ACTIVE.name());
-                    return agentProfileDao.selectList(select);
+                    select.setSessionType(sessionType);
+                    return agentProfileDao.selectAccessibleList(select);
                 })
             )
             .map(CompletableFuture::join)
@@ -135,17 +143,20 @@ public class AgentProfileServiceImpl implements AgentProfileService {
      */
     @Override
     public List<AgentOptionVo> selectActiveOptions() {
+        String sessionType = currentSessionType();
         return Stream.of(
                 ContextExecutors.callVirtual(() -> {
                     AgentProfileSelectDto select = new AgentProfileSelectDto();
                     select.setResourceType(ResourceType.PLATFORM.name());
                     select.setStatus(ResourceStatus.ACTIVE.name());
+                    select.setSessionType(sessionType);
                     return agentProfileDao.selectOptionsListWithoutIsolation(select);
                 }),
                 ContextExecutors.callVirtual(() -> {
                     AgentProfileSelectDto select = new AgentProfileSelectDto();
                     select.setResourceType(ResourceType.CUSTOM.name());
                     select.setStatus(ResourceStatus.ACTIVE.name());
+                    select.setSessionType(sessionType);
                     return agentProfileDao.selectOptionsList(select);
                 })
             )
@@ -157,19 +168,21 @@ public class AgentProfileServiceImpl implements AgentProfileService {
     }
 
     /**
-     * 按 agentId 解析画像（含 status，不筛 ACTIVE）。
+     * 按 agentId 解析当前会话可访问的画像（含 status，不筛 ACTIVE），供 runtime 入口校验。
      *
-     * <p>先本租户 CUSTOM，再 PLATFORM 不隔离；不按 ACTIVE 过滤，status 原样返回。
+     * <p>先本租户 CUSTOM，再 PLATFORM 不隔离；不按 ACTIVE 过滤，status 原样返回；
+     * 当前会话类型未授权视为不存在。
      *
      * @param agentId 数字员工标识
-     * @return 画像摘要；不存在为 null
+     * @return 画像摘要；不存在或无权访问为 null
      */
     @Override
     public AgentCatalogItemVo resolveProfile(Long agentId) {
         AgentProfileSelectDto select = new AgentProfileSelectDto();
         select.setId(agentId);
+        select.setSessionType(currentSessionType());
         select.setResourceType(ResourceType.CUSTOM.name());
-        var agentProfiles = agentProfileDao.selectList(select);
+        var agentProfiles = agentProfileDao.selectAccessibleList(select);
         if (Collections.isNotEmpty(agentProfiles)) {
             return AgentProfileConverter.INSTANCE.po2catalog(
                 agentProfiles.getFirst()
@@ -177,7 +190,7 @@ public class AgentProfileServiceImpl implements AgentProfileService {
         }
 
         select.setResourceType(ResourceType.PLATFORM.name());
-        agentProfiles = agentProfileDao.selectListWithoutIsolation(select);
+        agentProfiles = agentProfileDao.selectAccessibleListWithoutIsolation(select);
         if (Collections.isEmpty(agentProfiles)) {
             return null;
         }
@@ -185,6 +198,36 @@ public class AgentProfileServiceImpl implements AgentProfileService {
         return AgentProfileConverter.INSTANCE.po2catalog(
             agentProfiles.getFirst()
         );
+    }
+
+    /**
+     * 按 agentId 查询智能体名称（不按会话类型过滤），供管理端展示。
+     *
+     * <p>先本租户 CUSTOM，再 PLATFORM 不隔离。
+     *
+     * @param agentId 数字员工标识
+     * @return 智能体名称；不存在为 null
+     */
+    @Override
+    public String selectAgentName(Long agentId) {
+        AgentProfileSelectDto select = new AgentProfileSelectDto();
+        select.setId(agentId);
+        select.setResourceType(ResourceType.CUSTOM.name());
+        var agentProfiles = agentProfileDao.selectList(select);
+        if (Collections.isEmpty(agentProfiles)) {
+            select.setResourceType(ResourceType.PLATFORM.name());
+            agentProfiles = agentProfileDao.selectListWithoutIsolation(select);
+        }
+
+        return agentProfiles.stream().findFirst().map(AgentProfilePo::getAgentName).orElse(null);
+    }
+
+    /**
+     * 当前会话主体类型名；无会话为 null（查询以 IS NULL 兜底，不匹配任何智能体）。
+     */
+    private static String currentSessionType() {
+        SessionType sessionType = PrincipalContextHolder.getSessionType();
+        return Objects.isNull(sessionType) ? null : sessionType.name();
     }
 
     /**
@@ -360,7 +403,7 @@ public class AgentProfileServiceImpl implements AgentProfileService {
     }
 
     /**
-     * 删除智能体：级联删除其下 Skill 及各 Skill 的 Tool 绑定。
+     * 删除智能体：级联删除其下 Skill、各 Skill 的 Tool 绑定及会话绑定。
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -370,6 +413,7 @@ public class AgentProfileServiceImpl implements AgentProfileService {
 
         skillToolBindingDao.deleteByAgentId(id);
         skillProfileDao.deleteByAgentId(id);
+        agentSessionBindingDao.deleteByAgentId(id);
         return agentProfileDao.delete(id);
     }
 

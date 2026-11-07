@@ -416,6 +416,50 @@
         <include refid="selectListBody"/>
     </select>
 
+    <!-- 可访问条件：当前会话类型存在有效绑定；sessionType 为空时以 IS NULL 兜底（不匹配任何记录） -->
+    <sql id="accessibleCondition">
+        AND EXISTS (
+            SELECT 1 FROM agent_session_binding b
+            WHERE b.agent_id = agent_profile.id
+            AND b.delete_flag = 0
+            <choose>
+                <when test="sessionType != null">
+                    AND b.session_type = #{sessionType, jdbcType=VARCHAR}
+                </when>
+                <otherwise>
+                    AND b.session_type IS NULL
+                </otherwise>
+            </choose>
+        )
+    </sql>
+
+    <!-- selectAccessibleList / selectAccessibleListWithoutIsolation：目录与入口校验字段 + 可访问条件 -->
+    <sql id="selectAccessibleListBody">
+        SELECT id, agent_code, agent_name, identity_desc, mission_desc, boundary_desc, style_desc, principle_desc, status
+        FROM agent_profile
+        <where>
+            <if test="id != null">
+                AND id = #{id, jdbcType=BIGINT}
+            </if>
+            <if test="resourceType != null">
+                AND resource_type = #{resourceType, jdbcType=VARCHAR}
+            </if>
+            <if test="status != null">
+                AND status = #{status, jdbcType=VARCHAR}
+            </if>
+            <include refid="accessibleCondition"/>
+            AND (delete_flag = 0 OR delete_flag IS NULL)
+        </where>
+    </sql>
+
+    <select id="selectAccessibleList" parameterType="com.g2rain.agent.studio.dto.AgentProfileSelectDto" resultMap="BaseResultMap">
+        <include refid="selectAccessibleListBody"/>
+    </select>
+
+    <select id="selectAccessibleListWithoutIsolation" parameterType="com.g2rain.agent.studio.dto.AgentProfileSelectDto" resultMap="BaseResultMap">
+        <include refid="selectAccessibleListBody"/>
+    </select>
+
     <!-- selectOptionsList / selectOptionsListWithoutIsolation：仅 id + agent_name -->
     <sql id="selectOptionsListBody">
         SELECT id, agent_name
@@ -445,6 +489,7 @@
             <if test="status != null">
                 AND status = #{status, jdbcType=VARCHAR}
             </if>
+            <include refid="accessibleCondition"/>
             AND (delete_flag = 0 OR delete_flag IS NULL)
         </where>
         <include refid="dynamicOrderBy"/>

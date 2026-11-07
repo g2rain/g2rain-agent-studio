@@ -87,4 +87,10 @@ public class AgentProfileSelectDto extends BaseSelectListDto {
      */
     @Schema(description = "备注")
     private String description;
+
+    /**
+     * 当前会话主体类型（服务端注入，限定可访问的智能体；为空时不匹配任何智能体）
+     */
+    @Schema(hidden = true)
+    private String sessionType;
 }
