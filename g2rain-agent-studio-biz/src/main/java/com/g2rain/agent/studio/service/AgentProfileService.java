@@ -52,12 +52,20 @@ public interface AgentProfileService {
     List<AgentOptionVo> selectActiveOptions();
 
     /**
-     * 按 agentId 解析画像（含 status，不筛 ACTIVE）。
+     * 按 agentId 解析当前会话可访问的画像（含 status，不筛 ACTIVE）。
      *
      * @param agentId 数字员工标识
-     * @return 画像摘要；不存在为 null
+     * @return 画像摘要；不存在或无权访问为 null
      */
     AgentCatalogItemVo resolveProfile(Long agentId);
+
+    /**
+     * 按 agentId 查询智能体名称（不按会话类型过滤）。
+     *
+     * @param agentId 数字员工标识
+     * @return 智能体名称；不存在为 null
+     */
+    String selectAgentName(Long agentId);
 
     /**
      * 按 agentId 查询 ACTIVE Skill 短目录（不含手册 / 契约 / tools）。

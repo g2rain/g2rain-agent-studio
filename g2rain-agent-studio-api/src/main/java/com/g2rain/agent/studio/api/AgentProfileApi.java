@@ -70,13 +70,14 @@ public interface AgentProfileApi {
     /**
      * 按 agentId 解析画像（含 status，不筛 ACTIVE），供入口校验不存在 / 未启用。
      *
-     * <p>先查本租户 CUSTOM，未命中再查 PLATFORM（不隔离）；无记录返回 null。
+     * <p>先查本租户 CUSTOM，未命中再查 PLATFORM（不隔离）；按当前会话类型过滤，无记录或无权访问返回 null。
      *
      * @param agentId 数字员工标识
      * @return 画像摘要（含 status）；不存在为 null
      */
     @GetMapping("/{agentId}/resolve")
-    @Operation(summary = "解析数字员工画像", description = "按 id 返回画像含 status；CUSTOM 租户隔离，PLATFORM 不隔离；不存在返回空")
+    @Operation(summary = "解析数字员工画像", hidden = true,
+        description = "供 runtime 入口校验：按 id 返回当前会话类型可访问的画像含 status；CUSTOM 租户隔离，PLATFORM 不隔离；不存在或无权访问返回空")
     Result<AgentCatalogItemVo> resolveProfile(@Parameter(description = "数字员工标识") @PathVariable("agentId") Long agentId);
 
     /**
