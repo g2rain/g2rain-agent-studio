@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
@@ -94,13 +95,16 @@ public interface AgentProfileApi {
     /**
      * 按 agentId 查询能力包：Skill（含手册/契约）及其绑定 Tool 列表，供 hydrate / 执行。
      *
-     * @param agentId 数字员工标识
+     * @param agentId         数字员工标识
+     * @param skillRevisionId 可选；给出时用该修订快照替换对应技能
      * @return 能力包；无绑定时 skills 为空列表
      */
     @GetMapping("/{agentId}/capability_bundle")
     @Operation(summary = "查询数字员工能力包", hidden = true,
-        description = "按 agentId 返回启用 Skill 完整字段，tools 挂在各 Skill 下")
-    Result<AgentBundleVo> selectCapabilityBundle(@Parameter(description = "数字员工标识") @PathVariable("agentId") Long agentId);
+        description = "按 agentId 返回启用 Skill 完整字段，tools 挂在各 Skill 下；可选按修订替换单个技能")
+    Result<AgentBundleVo> selectCapabilityBundle(
+        @Parameter(description = "数字员工标识") @PathVariable("agentId") Long agentId,
+        @Parameter(description = "可选技能修订主键") @RequestParam(value = "skillRevisionId", required = false) Long skillRevisionId);
 
     /**
      * 分页查询自建智能体（服务端写死 resourceType=CUSTOM）。

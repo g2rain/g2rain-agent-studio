@@ -4,9 +4,11 @@ import com.g2rain.agent.studio.converter.AgentProfileConverter;
 import com.g2rain.agent.studio.dao.AgentProfileDao;
 import com.g2rain.agent.studio.dao.AgentSessionBindingDao;
 import com.g2rain.agent.studio.dao.SkillProfileDao;
+import com.g2rain.agent.studio.dao.SkillRevisionDao;
 import com.g2rain.agent.studio.dao.SkillToolBindingDao;
 import com.g2rain.agent.studio.dao.po.AgentProfilePo;
 import com.g2rain.agent.studio.dao.po.SkillProfilePo;
+import com.g2rain.agent.studio.dao.po.SkillRevisionPo;
 import com.g2rain.agent.studio.dao.po.SkillToolBindingPo;
 import com.g2rain.agent.studio.dto.AgentProfileDto;
 import com.g2rain.agent.studio.dto.AgentProfileSelectDto;
@@ -16,6 +18,7 @@ import com.g2rain.agent.studio.dto.UpdateStatusDto;
 import com.g2rain.agent.studio.enums.EnabledFlag;
 import com.g2rain.agent.studio.enums.ResourceStatus;
 import com.g2rain.agent.studio.enums.ResourceType;
+import com.g2rain.agent.studio.enums.StudioErrorCode;
 import com.g2rain.agent.studio.service.AgentProfileService;
 import com.g2rain.agent.studio.vo.AgentBundleVo;
 import com.g2rain.agent.studio.vo.AgentCatalogItemVo;
@@ -24,13 +27,17 @@ import com.g2rain.agent.studio.vo.AgentProfileVo;
 import com.g2rain.agent.studio.vo.SkillDigestVo;
 import com.g2rain.common.concurrent.ContextExecutors;
 import com.g2rain.common.enums.SessionType;
+import com.g2rain.common.exception.BusinessException;
 import com.g2rain.common.exception.SystemErrorCode;
 import com.g2rain.common.id.IdGenerator;
+import com.g2rain.common.json.JsonCodec;
+import com.g2rain.common.json.JsonCodecFactory;
 import com.g2rain.common.model.PageData;
 import com.g2rain.common.model.PageSelectListDto;
 import com.g2rain.common.utils.Asserts;
 import com.g2rain.common.utils.Collections;
 import com.g2rain.common.utils.Moments;
+import com.g2rain.common.utils.Strings;
 import com.g2rain.common.validation.Validations;
 import com.g2rain.common.web.PrincipalContextHolder;
 import com.g2rain.mybatis.pagination.PageContext;
@@ -40,8 +47,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.type.TypeReference;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -61,6 +70,8 @@ import java.util.stream.Stream;
 @Service(value = "agentProfileServiceImpl")
 public class AgentProfileServiceImpl implements AgentProfileService {
 
+    private static final JsonCodec JSON = JsonCodecFactory.instance();
+
     @Resource(name = "agentProfileDao")
     private AgentProfileDao agentProfileDao;
 
@@ -69,6 +80,9 @@ public class AgentProfileServiceImpl implements AgentProfileService {
 
     @Resource(name = "skillProfileDao")
     private SkillProfileDao skillProfileDao;
+
+    @Resource(name = "skillRevisionDao")
+    private SkillRevisionDao skillRevisionDao;
 
     @Resource(name = "agentSessionBindingDao")
     private AgentSessionBindingDao agentSessionBindingDao;
@@ -270,49 +284,132 @@ public class AgentProfileServiceImpl implements AgentProfileService {
     /**
      * 按 agentId 查询能力包：Skill（手册/契约）+ 其下 Tool 列表。
      *
-     * @param agentId 数字员工标识
+     * @param agentId         数字员工标识
+     * @param skillRevisionId 可选；给出时用该修订快照替换对应技能
      * @return 能力包；无技能时 skills 为空列表
      */
     @Override
-    public AgentBundleVo selectCapabilityBundle(Long agentId) {
+    public AgentBundleVo selectCapabilityBundle(Long agentId, Long skillRevisionId) {
         List<SkillProfilePo> skillProfiles = loadActiveSkills(agentId);
-        if (Collections.isEmpty(skillProfiles)) {
-            return new AgentBundleVo(List.of());
+        List<AgentBundleVo.SkillBriefVo> skills = List.of();
+        if (Collections.isNotEmpty(skillProfiles)) {
+            Set<Long> skillIds = skillProfiles.stream()
+                .map(SkillProfilePo::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(HashSet::new));
+            SkillToolBindingSelectDto toolSelect = new SkillToolBindingSelectDto();
+            toolSelect.setSkillIds(skillIds);
+            toolSelect.setEnabledFlag(EnabledFlag.YES.getCode());
+            var toolBindings = skillToolBindingDao.selectListWithoutIsolation(toolSelect);
+
+            Map<Long, List<AgentBundleVo.ToolBriefVo>> toolsBySkill = toolBindings.stream()
+                .collect(Collectors.groupingBy(
+                    SkillToolBindingPo::getSkillId,
+                    Collectors.mapping(b -> {
+                        AgentBundleVo.ToolBriefVo t = new AgentBundleVo.ToolBriefVo();
+                        t.setToolName(b.getToolName());
+                        return t;
+                    }, Collectors.toList())
+                ));
+
+            skills = skillProfiles.stream()
+                .map(skill -> {
+                    AgentBundleVo.SkillBriefVo brief = new AgentBundleVo.SkillBriefVo();
+                    brief.setSkillKey(skill.getSkillKey());
+                    brief.setSkillName(skill.getSkillName());
+                    brief.setSemanticDesc(skill.getSemanticDesc());
+                    brief.setSkillManual(skill.getSkillManual());
+                    brief.setSkillContract(skill.getSkillContract());
+                    brief.setTools(toolsBySkill.getOrDefault(skill.getId(), List.of()));
+                    return brief;
+                })
+                .toList();
         }
 
-        Set<Long> skillIds = skillProfiles.stream()
-            .map(SkillProfilePo::getId)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toCollection(HashSet::new));
-        SkillToolBindingSelectDto toolSelect = new SkillToolBindingSelectDto();
-        toolSelect.setSkillIds(skillIds);
-        toolSelect.setEnabledFlag(EnabledFlag.YES.getCode());
-        var toolBindings = skillToolBindingDao.selectListWithoutIsolation(toolSelect);
+        AgentBundleVo bundle = new AgentBundleVo(skills);
+        if (Objects.isNull(skillRevisionId)) {
+            return bundle;
+        }
 
-        Map<Long, List<AgentBundleVo.ToolBriefVo>> toolsBySkill = toolBindings.stream()
-            .collect(Collectors.groupingBy(
-                SkillToolBindingPo::getSkillId,
-                Collectors.mapping(b -> {
-                    AgentBundleVo.ToolBriefVo t = new AgentBundleVo.ToolBriefVo();
-                    t.setToolName(b.getToolName());
-                    return t;
-                }, Collectors.toList())
-            ));
+        return applySkillRevision(agentId, skillRevisionId, bundle);
+    }
 
-        List<AgentBundleVo.SkillBriefVo> skills = skillProfiles.stream()
-            .map(skill -> {
-                AgentBundleVo.SkillBriefVo brief = new AgentBundleVo.SkillBriefVo();
-                brief.setSkillKey(skill.getSkillKey());
-                brief.setSkillName(skill.getSkillName());
-                brief.setSemanticDesc(skill.getSemanticDesc());
-                brief.setSkillManual(skill.getSkillManual());
-                brief.setSkillContract(skill.getSkillContract());
-                brief.setTools(toolsBySkill.getOrDefault(skill.getId(), List.of()));
-                return brief;
-            })
-            .toList();
+    /**
+     * 用指定修订快照替换技能包中对应技能；修订须同机构且技能属于该数字员工。
+     *
+     * @param agentId         数字员工标识
+     * @param skillRevisionId 修订主键
+     * @param bundle          当前能力包
+     * @return 替换后的能力包
+     */
+    private AgentBundleVo applySkillRevision(Long agentId, Long skillRevisionId, AgentBundleVo bundle) {
+        SkillRevisionPo revision = skillRevisionDao.selectById(skillRevisionId);
+        Asserts.isTrue(Objects.nonNull(revision), SystemErrorCode.DATA_NOT_EXISTS, skillRevisionId);
+
+        AgentProfilePo agent = agentProfileDao.selectById(agentId);
+        Asserts.isTrue(Objects.nonNull(agent), SystemErrorCode.DATA_NOT_EXISTS, agentId);
+        if (!Objects.equals(revision.getOrganId(), agent.getOrganId())) {
+            throw new BusinessException(StudioErrorCode.REVISION_AGENT_MISMATCH, skillRevisionId);
+        }
+
+        SkillProfilePo skill = skillProfileDao.selectByIdWithoutIsolation(revision.getSkillId());
+        Asserts.isTrue(Objects.nonNull(skill), SystemErrorCode.DATA_NOT_EXISTS, revision.getSkillId());
+        if (!Objects.equals(skill.getAgentId(), agentId)) {
+            throw new BusinessException(StudioErrorCode.REVISION_AGENT_MISMATCH, skillRevisionId);
+        }
+
+        List<AgentBundleVo.ToolBriefVo> tools = new ArrayList<>();
+        for (String toolName : parseToolNames(revision.getToolNames())) {
+            if (Strings.isBlank(toolName)) {
+                continue;
+            }
+            AgentBundleVo.ToolBriefVo tool = new AgentBundleVo.ToolBriefVo();
+            tool.setToolName(toolName);
+            tools.add(tool);
+        }
+
+        List<AgentBundleVo.SkillBriefVo> skills = new ArrayList<>(bundle.getSkills().size());
+        boolean replaced = false;
+        for (AgentBundleVo.SkillBriefVo brief : bundle.getSkills()) {
+            if (Objects.equals(brief.getSkillKey(), skill.getSkillKey())) {
+                brief.setSkillName(revision.getSkillName());
+                brief.setSemanticDesc(revision.getSemanticDesc());
+                brief.setSkillManual(revision.getSkillManual());
+                brief.setSkillContract(revision.getSkillContract());
+                brief.setTools(tools);
+                replaced = true;
+            }
+            skills.add(brief);
+        }
+
+        if (!replaced) {
+            AgentBundleVo.SkillBriefVo brief = new AgentBundleVo.SkillBriefVo();
+            brief.setSkillKey(skill.getSkillKey());
+            brief.setSkillName(revision.getSkillName());
+            brief.setSemanticDesc(revision.getSemanticDesc());
+            brief.setSkillManual(revision.getSkillManual());
+            brief.setSkillContract(revision.getSkillContract());
+            brief.setTools(tools);
+            skills.add(brief);
+        }
 
         return new AgentBundleVo(skills);
+    }
+
+    /**
+     * 解析修订快照中的工具名 JSON。
+     *
+     * @param json 工具名数组 JSON；可空
+     * @return 工具名列表
+     */
+    private List<String> parseToolNames(String json) {
+        if (Strings.isBlank(json)) {
+            return List.of();
+        }
+
+        List<String> names = JSON.str2obj(json, new TypeReference<List<String>>() {
+        });
+        return Objects.requireNonNullElse(names, List.of());
     }
 
     /**

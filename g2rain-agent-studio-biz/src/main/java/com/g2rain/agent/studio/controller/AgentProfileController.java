@@ -82,8 +82,8 @@ public class AgentProfileController implements AgentProfileApi {
 
     @Override
     @IdentityInject(organIdPropertyName = "organId")
-    public Result<AgentBundleVo> selectCapabilityBundle(Long agentId) {
-        return Result.success(agentProfileService.selectCapabilityBundle(agentId));
+    public Result<AgentBundleVo> selectCapabilityBundle(Long agentId, Long skillRevisionId) {
+        return Result.success(agentProfileService.selectCapabilityBundle(agentId, skillRevisionId));
     }
 
     @Override

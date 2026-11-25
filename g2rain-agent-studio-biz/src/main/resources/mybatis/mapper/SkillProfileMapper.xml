@@ -442,6 +442,12 @@
         <include refid="selectByIdBody"/>
     </select>
 
+    <!-- 按主键查询并加行锁（发布 / 回滚串行） -->
+    <select id="selectByIdForUpdate" parameterType="Long" resultMap="BaseResultMap">
+        <include refid="selectByIdBody"/>
+        FOR UPDATE
+    </select>
+
     <!-- 根据 SelectDto 条件查询列表 -->
     <select id="selectList" parameterType="com.g2rain.agent.studio.dto.SkillProfileSelectDto" resultMap="BaseResultMap">
         <include refid="selectListBody"/>

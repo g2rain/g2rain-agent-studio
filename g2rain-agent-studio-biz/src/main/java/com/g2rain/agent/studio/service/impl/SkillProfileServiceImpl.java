@@ -12,6 +12,7 @@ import com.g2rain.agent.studio.dto.SkillToolBindingSelectDto;
 import com.g2rain.agent.studio.dto.UpdateStatusDto;
 import com.g2rain.agent.studio.enums.ResourceStatus;
 import com.g2rain.agent.studio.service.SkillProfileService;
+import com.g2rain.agent.studio.service.SkillRevisionService;
 import com.g2rain.agent.studio.vo.SkillProfileVo;
 import com.g2rain.common.exception.SystemErrorCode;
 import com.g2rain.common.id.IdGenerator;
@@ -51,6 +52,9 @@ public class SkillProfileServiceImpl implements SkillProfileService {
     @Resource(name = "skillToolBindingDao")
     private SkillToolBindingDao skillToolBindingDao;
 
+    @Resource(name = "skillRevisionServiceImpl")
+    private SkillRevisionService skillRevisionService;
+
     private IdGenerator idGenerator;
 
     @Qualifier("idGenerator")
@@ -80,6 +84,7 @@ public class SkillProfileServiceImpl implements SkillProfileService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Long save(SkillProfileDto dto) {
         Validations.validateSave(dto);
         // resourceType 跟所属智能体走，不信客户端传值
@@ -118,11 +123,12 @@ public class SkillProfileServiceImpl implements SkillProfileService {
             Asserts.greaterThan(skillProfileDao.update(entity), 0, SystemErrorCode.UPDATE_DATA_ERROR, id);
         }
 
+        skillRevisionService.recordPublishedSnapshot(entity.getId());
         return entity.getId();
     }
 
     /**
-     * 删除 Skill：级联删除其下 Tool 绑定。
+     * 删除 Skill：级联删除其下 Tool 绑定与修订。
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -133,6 +139,7 @@ public class SkillProfileServiceImpl implements SkillProfileService {
         SkillToolBindingSelectDto toolSelect = new SkillToolBindingSelectDto();
         toolSelect.setSkillId(id);
         skillToolBindingDao.selectList(toolSelect).forEach(b -> skillToolBindingDao.delete(b.getId()));
+        skillRevisionService.deleteBySkillId(id);
         return skillProfileDao.delete(id);
     }
 

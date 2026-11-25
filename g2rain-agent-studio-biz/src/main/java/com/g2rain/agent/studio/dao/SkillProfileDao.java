@@ -5,6 +5,7 @@ import com.g2rain.agent.studio.dto.SkillProfileSelectDto;
 import com.g2rain.data.isolation.annotations.DataIsolation;
 import com.g2rain.data.isolation.annotations.IgnoreIsolation;
 import org.apache.ibatis.annotations.Mapper;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -73,6 +74,15 @@ public interface SkillProfileDao {
      * @return 实体对象
      */
     SkillProfilePo selectById(Long id);
+
+    /**
+     * 按主键查询并加行锁：发布、回滚以此开始，同一技能上的发布串行。
+     *
+     * @param id 技能主键
+     * @return 技能行；不存在时为空
+     */
+    @Nullable
+    SkillProfilePo selectByIdForUpdate(Long id);
 
     /**
      * 根据查询入参 DTO 筛选列表

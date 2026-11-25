@@ -78,10 +78,11 @@ public interface AgentProfileService {
     /**
      * 按 agentId 查询能力包：Skill（手册/契约）+ 其下 Tool 列表。
      *
-     * @param agentId 数字员工标识
+     * @param agentId         数字员工标识
+     * @param skillRevisionId 可选；给出时用该修订快照替换对应技能
      * @return 能力包；无技能时 skills 为空列表
      */
-    AgentBundleVo selectCapabilityBundle(Long agentId);
+    AgentBundleVo selectCapabilityBundle(Long agentId, Long skillRevisionId);
 
     /**
      * 根据条件分页查询

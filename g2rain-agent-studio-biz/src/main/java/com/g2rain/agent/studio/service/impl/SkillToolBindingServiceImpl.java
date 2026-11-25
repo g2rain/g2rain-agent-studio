@@ -7,6 +7,7 @@ import com.g2rain.agent.studio.dto.SkillToolBindingDto;
 import com.g2rain.agent.studio.dto.SkillToolBindingSelectDto;
 import com.g2rain.agent.studio.dto.UpdateEnabledFlagDto;
 import com.g2rain.agent.studio.enums.EnabledFlag;
+import com.g2rain.agent.studio.service.SkillRevisionService;
 import com.g2rain.agent.studio.service.SkillToolBindingService;
 import com.g2rain.agent.studio.vo.SkillToolBindingVo;
 import com.g2rain.common.exception.SystemErrorCode;
@@ -24,6 +25,7 @@ import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -40,6 +42,9 @@ public class SkillToolBindingServiceImpl implements SkillToolBindingService {
 
     @Resource(name = "skillToolBindingDao")
     private SkillToolBindingDao skillToolBindingDao;
+
+    @Resource(name = "skillRevisionServiceImpl")
+    private SkillRevisionService skillRevisionService;
 
     private IdGenerator idGenerator;
 
@@ -70,6 +75,7 @@ public class SkillToolBindingServiceImpl implements SkillToolBindingService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Long save(SkillToolBindingDto dto) {
         Validations.validateSave(dto);
 
@@ -78,6 +84,7 @@ public class SkillToolBindingServiceImpl implements SkillToolBindingService {
 
         // 判断是新增还是更新
         Long id = entity.getId();
+        Long trailSkillId = dto.getSkillId();
         if (Objects.isNull(id) || id == 0) {
             // 同一技能下同 tool 已存在则直接返回，不重复插入
             SkillToolBindingPo duplicated = findBySkillTool(dto.getSkillId(), dto.getToolName());
@@ -99,8 +106,10 @@ public class SkillToolBindingServiceImpl implements SkillToolBindingService {
             entity.setEnabledFlag(null);
             entity.setUpdateTime(Moments.now());
             Asserts.greaterThan(skillToolBindingDao.update(entity), 0, SystemErrorCode.UPDATE_DATA_ERROR, id);
+            trailSkillId = Objects.requireNonNullElse(dto.getSkillId(), existing.getSkillId());
         }
 
+        skillRevisionService.recordPublishedSnapshot(trailSkillId);
         return entity.getId();
     }
 
@@ -116,10 +125,13 @@ public class SkillToolBindingServiceImpl implements SkillToolBindingService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int delete(Long id) {
         SkillToolBindingPo existing = skillToolBindingDao.selectById(id);
         Asserts.isTrue(Objects.nonNull(existing), SystemErrorCode.DATA_NOT_EXISTS, id);
-        return skillToolBindingDao.delete(id);
+        int rows = skillToolBindingDao.delete(id);
+        skillRevisionService.recordPublishedSnapshot(existing.getSkillId());
+        return rows;
     }
 
     @Override
