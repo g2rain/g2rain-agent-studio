@@ -15,7 +15,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -49,30 +48,25 @@ public class SkillRevisionController implements SkillRevisionApi {
         return Result.successPage(skillRevisionService.selectPage(selectDto));
     }
 
-    @GetMapping("/{id}")
-    @Operation(summary = "查询Skill 修订详情", description = "根据主键查询修订详情")
-    public Result<SkillRevisionVo> selectById(@Parameter(description = "修订主键") @PathVariable Long id) {
+    @Override
+    public Result<SkillRevisionVo> selectById(Long id) {
         return Result.success(skillRevisionService.selectById(id));
     }
 
-    @PostMapping("/draft")
+    @Override
     @IdentityInject(organIdPropertyName = "organId")
-    @Operation(summary = "创建技能修订草稿", description = "以当前发布修订为底覆盖字段生成候选草稿")
-    public Result<Long> createDraft(@RequestBody CreateSkillRevisionDraftDto dto) {
+    public Result<Long> createDraft(CreateSkillRevisionDraftDto dto) {
         return Result.success(skillRevisionService.createDraft(dto));
     }
 
-    @PostMapping("/{id}/publish")
-    @Operation(summary = "发布技能修订草稿", description = "快照写回技能与绑定，草稿升为发布")
-    public Result<Void> publish(@Parameter(description = "草稿主键") @PathVariable Long id,
-                                @RequestBody PublishSkillRevisionDto dto) {
+    @Override
+    public Result<Void> publish(Long id, PublishSkillRevisionDto dto) {
         skillRevisionService.publish(id, dto);
         return Result.success(null);
     }
 
-    @PostMapping("/{id}/discard")
-    @Operation(summary = "丢弃技能修订草稿", description = "草稿改为已丢弃")
-    public Result<Void> discard(@Parameter(description = "草稿主键") @PathVariable Long id) {
+    @Override
+    public Result<Void> discard(Long id) {
         skillRevisionService.discard(id);
         return Result.success(null);
     }
